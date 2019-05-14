@@ -6,6 +6,15 @@
 Welcome to pyCOMPASS's documentation!
 =====================================
 
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Table of Contents
+
+   install_package
+   examples
+   api
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

@@ -28,6 +28,9 @@ version = ''
 # The full version, including alpha/beta/rc tags
 release = '0.5'
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- General configuration ---------------------------------------------------
 
@@ -40,6 +43,8 @@ release = '0.5'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.coverage',
+    'sphinx.ext.napoleon'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
