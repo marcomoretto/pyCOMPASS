@@ -16,22 +16,32 @@ def run_query(url, query, headers=None):
         raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
 
 
-def query_getter(base, default_fields):
+def query_getter(base, default_fields, *args_, **kwargs_):
     def actual_decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            headers = {"Authorization": "JWT " + self.connection._token}
+            headers = None
+            if self.connection and self.connection.__token__:
+                headers = {"Authorization": "JWT " + self.connection.__token__}
             filter_string = ''
             if 'filter' in kwargs and kwargs['filter']:
                 flt = []
+                correct_quotes = False
                 for k, v in kwargs['filter'].items():
                     if type(v) == str:
                         flt.append(k + ':"' + v + '"')
+                    elif type(v) == bool:
+                        flt.append(k + ':' + str(v).lower())
                     else:
                         flt.append(k + ':' + str(v))
+                        correct_quotes = True
                 filter_string = ',' + ' '.join(flt)
+                if correct_quotes:
+                    filter_string = filter_string.replace("'", '"')
             if 'fields' in kwargs and kwargs['fields']:
-                fields_string = ','.join(kwargs['fields'])
+                if type(kwargs['fields']) != list:
+                    raise Exception('fields must be a list')
+                fields_string = ','.join(list(set(['id'] + kwargs['fields'])))
             else:
                 fields_string = ','.join(default_fields)
             query = '''\
@@ -48,7 +58,7 @@ def query_getter(base, default_fields):
             json = run_query(self.connection.url, query, headers=headers)
             if 'errors' in json:
                 raise ValueError(json['errors'])
-            return json['data']
+            return [e['node'] for e in json['data'][base]['edges']]
         return wrapper
     return actual_decorator
 

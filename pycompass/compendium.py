@@ -1,80 +1,66 @@
-from pycompass import module
-from pycompass.connect import Connect
+from pycompass import __module
 from pycompass.query import run_query, query_getter
 import numpy as np
 
+from pycompass.utils import get_factory
 
-class Compendium:
 
-    def __init__(self, compendium_name, connection=None):
-        '''
-        The compendium object represent a single compendium connection
+def new__init__(self, *args, **kwargs):
+    raise ValueError('Compendium object should be created using Connect.get_compendium() or Connect.get_compendia() methods!')
 
-        :param compendium_name: the compendium name
-        :param connection: the Connect object
-        '''
-        self.compendium_name = compendium_name
-        self.connection = connection
 
-    def connect(self, compendium_name, url, username=None, password=None):
-        '''
-        Connect to a specific compendium
+class Compendium(metaclass=get_factory(new__init__)):
 
-        :param compendium_name: the compendium name
-        :param url: the COMPASS GraphQL endpoint URL
-        :param username: the username
-        :param password: the password
-        '''
-        self.compendium_name = compendium_name
-        self.connection = Connect(url, username=username, password=password)
+    def __init__(self, *args, **kwargs):
+        self.compendium_name = kwargs['compendium_name']
+        self.connection = kwargs['connection']
+        self.compendium_full_name = kwargs['compendium_full_name']
+        self.description = kwargs['description']
+        self.normalization = {}
+        for n in kwargs['normalization']:
+            self.normalization[n] = self.__get_score_rank_methods__(n)
 
-    @query_getter('dataSources', ['id', 'sourceName', 'isLocal'])
+        return self
+
     def get_data_sources(self, filter=None, fields=None):
         '''
         Get the experiments data sources both local and public
 
         :param filter: return results that match only filter values
         :param fields: return only specific fields
-        :return: dict
+        :return: list of dict
         '''
-        pass
+        @query_getter('dataSources', ['id', 'sourceName', 'isLocal'])
+        def _get_data_sources(obj, filter=None, fields=None):
+            pass
+        return _get_data_sources(self, filter=filter, fields=fields)
 
-    @query_getter('platforms', ['platformAccessId', 'platformName', 'description',
-                                'dataSource { sourceName }',
-                                'platformType { name }'])
-    def get_platforms(self, filter=None, fields=None):
-        '''
-        Get the experiment platforms
-
-        :param filter: return results that match only filter values
-        :param fields: return only specific fields
-        :return: dict
-        '''
-        pass
-
-    @query_getter('platformTypes', ['id', 'name', 'description'])
     def get_platform_types(self, filter=None, fields=None):
         '''
         Get the platform types
 
         :param filter: return results that match only filter values
         :param fields: return only specific fields
-        :return: dict
+        :return: list of dict
         '''
-        pass
+        @query_getter('platformTypes', ['id', 'name', 'description'])
+        def _get_platform_types(obj, filter=None, fields=None):
+            pass
+        return _get_platform_types(self, filter=filter, fields=fields)
 
-    @query_getter('experiments', ['id', 'organism', 'experimentAccessId', 'experimentName', 'scientificPaperRef',
-                                  'description', 'comments', 'dataSource { sourceName }'])
-    def get_experiments(self, filter=None, fields=None):
-        '''
-        Get compendium experiments
+    def __get_score_rank_methods__(self, normalization):
+        query = '''
+            {{
+              scoreRankMethods(compendium:"{compendium}", normalization:"{normalization}") {{
+                sampleSets,
+                biologicalFeatures
+              }}
+            }}
+        '''.format(compendium=self.compendium_name, normalization=normalization)
+        json = run_query(self.connection.url, query)
+        return json['data']
 
-        :param filter: return results that match only filter values
-        :param fields: return only specific fields
-        :return: dict
-        '''
-        pass
-
+    @DeprecationWarning
     @query_getter('sampleAnnoatations', ['annotation { ' +
                                             'value,' +
                                             'valueType,' +
@@ -99,6 +85,7 @@ class Compendium:
         '''
         pass
 
+    @DeprecationWarning
     @query_getter('biofeatureAnnotations', ['annotationValue {' +
                                                 'ontologyNode {' +
                                                     'originalId,' +
@@ -114,6 +101,7 @@ class Compendium:
         '''
         pass
 
+    @DeprecationWarning
     def get_ontology_names(self):
         '''
         Get all the available ontology names
@@ -127,6 +115,7 @@ class Compendium:
         r = _get_ontology_hierarchy(self)
         return [n['node']['name'] for n in r['ontology']['edges']]
 
+    @DeprecationWarning
     def get_ontology_hierarchy(self, ontology_name):
         '''
         Get the whole ontology structure in node-link format
@@ -139,6 +128,7 @@ class Compendium:
             pass
         return _get_ontology_hierarchy(self, filter={'name': ontology_name})
 
+    @DeprecationWarning
     def get_samples(self, by=None, fields=None):
         '''
         Get samples by annotation_terms, experiment or name
@@ -178,6 +168,7 @@ class Compendium:
         if 'name' in by:
             return _get_samples_by(self, filter={'sampleName_In': ','.join(by['name'])}, fields=fields)
 
+    @DeprecationWarning
     def get_sample_sets(self, by=None, fields=None):
         '''
         Get sample sets by id, name or samples
@@ -213,14 +204,17 @@ class Compendium:
             _ids = [s['node']['id'] for s in _samples['samples']['edges']]
             return _get_sample_sets_by(self, filter={'samples': ','.join(_ids)})
 
-    def get_biological_features(self, by=None, fields=None):
+    @DeprecationWarning
+    def get_biological_features(self, *args, **kwargs):
         '''
         Get biological feature by id, name or annotation_terms
 
         Example: compendium.get_biological_features(by={'name': 'BSU00010'})
+                 compendium.get_biological_features(filter={'first': 10})
 
-        :param by: name or annotation_terms
+        :param by: id, name or annotation_terms
         :param fields: return only specific fields
+        :param filter: return results that match only filter values
         :return: dict
         '''
         @query_getter('biofeatures', ['name,' +
@@ -230,8 +224,8 @@ class Compendium:
                                         'node {' +
                                           'bioFeatureField {' +
                                             'name' +
-                                          '}, value } } }'])
-        def _get_biological_features_by_name(obj, filter=None, fields=None):
+                                          '}, value } } }'], args, kwargs)
+        def _get_biological_features_by_name(obj, args, kwargs):
             pass
 
         @query_getter('biofeatureAnnotations', ['bioFeature {' +
@@ -246,20 +240,36 @@ class Compendium:
         def _get_biological_features_by_annotation(obj, filter=None, fields=None):
             pass
 
-        if 'id' in by:
-            return _get_biological_features_by_name(self, filter={'id_In': ','.join(by['id'])}, fields=fields)
+        fields = kwargs.get('fields', None)
+        filter = kwargs.get('filter', {})
 
-        if 'name' in by:
-            if type(by['name']) == str:
-                return _get_biological_features_by_name(self, filter={'name': by['name']}, fields=fields)
-            elif type(by['name']) == list:
-                return _get_biological_features_by_name(self, filter={'name_In': ','.join(by['name'])}, fields=fields)
-
-
-        if 'annotation_terms':
-            s = _get_biological_features_by_annotation(self, filter={
-                'annotationValue_OntologyNode_OriginalId_In': ','.join(by['annotation_terms'])})
-            return {'biofeatures': {'edges': [{'node': n['node']['bioFeature']} for n in s['biofeatureAnnotations']['edges']]}}
+        if 'by' in kwargs:
+            if 'id' in kwargs['by']:
+                return _get_biological_features_by_name(self,
+                                                        filter=dict(
+                                                            {'id_In': ','.join(kwargs['by']['id'])},
+                                                            **filter),
+                                                        fields=fields,)
+            elif 'name' in kwargs['by']:
+                if type(kwargs['by']['name']) == str:
+                    return _get_biological_features_by_name(self,
+                                                            filter=dict(
+                                                                {'name': kwargs['by']['name']},
+                                                                **filter),
+                                                            fields=fields)
+                elif type(kwargs['by']['name']) == list:
+                    return _get_biological_features_by_name(self,
+                                                            filter=dict(
+                                                                {'name_In': ','.join(kwargs['by']['name'])},
+                                                                **filter),
+                                                            fields=fields)
+            elif 'annotation_terms' in kwargs['by']:
+                s = _get_biological_features_by_annotation(self, filter=dict({
+                            'annotationValue_OntologyNode_OriginalId_In': ','.join(kwargs['by']['annotation_terms'])},
+                            **filter),
+                        fields=fields)
+                return {'biofeatures': {'edges': [{'node': n['node']['bioFeature']} for n in s['biofeatureAnnotations']['edges']]}}
+        return _get_biological_features_by_name(self, fields=fields, filter=filter)
 
     def list_modules(self):
         '''
@@ -323,10 +333,10 @@ class Compendium:
         '''
         if len(sample_sets) == 0 and normalization is None:
             raise Exception('If sample_sets is empty you need to provide a normalization for the automatic retrieval of sample_sets')
-        m = module.Module.__factory_build_object__(compendium=self,
-                                                   biological_features=biological_features,
-                                                   sample_sets=sample_sets,
-                                                   normalization=normalization,
-                                                   rank=rank)
+        m = __module.Module.__factory_build_object__(compendium=self,
+                                                     biological_features=biological_features,
+                                                     sample_sets=sample_sets,
+                                                     normalization=normalization,
+                                                     rank=rank)
         return m
 

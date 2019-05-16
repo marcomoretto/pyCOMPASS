@@ -1,3 +1,4 @@
+import pycompass
 from pycompass.query import run_query
 
 
@@ -14,7 +15,7 @@ class Connect:
         '''
 
         self.url = url
-        self._token = None
+        self.__token__ = None
         self.username = username
         self.password = password
         self.login(username, password)
@@ -31,7 +32,7 @@ class Connect:
         self.username = username
         self.password = password
         if self.username and self.password:
-            self._token = self._get_token()
+            self.__token__ = self.__get_token__()
 
     def signup(self, username=None, email=None, password=None):
         '''
@@ -58,12 +59,24 @@ class Connect:
         self.login(username, password)
         return True
 
+    def get_compendium(self, name):
+        '''
+        Get a compendium by a given name, None otherwise
+
+        :param name: the compendium name
+        :return: Compendium object
+        '''
+        for c in self.get_compendia():
+            if c.compendium_name == name:
+                return c
+        return None
+
     def get_compendia(self):
         '''
+        Get all available compendia
 
-        :return: list of all available compendia
+        :return: list of Compendium objects
         '''
-
         query = '''{
           compendia {
             name,
@@ -73,11 +86,36 @@ class Connect:
           }
         }'''
         json = run_query(self.url, query)
-        return json['data']
+        compendia = []
+        for c in json['data']['compendia']:
+            comp = pycompass.Compendium.__factory_build_object__(
+                compendium_name=c['name'],
+                connection=self,
+                compendium_full_name=c['fullName'],
+                description=c['description'],
+                normalization=c['normalization']
+            )
+            compendia.append(comp)
+        return compendia
 
+    def __get_token__(self):
+        query = '''\
+            mutation {{\
+                tokenAuth(username: "{}", password: "{}") {{\
+                    token\
+                }}\
+            }}\
+        '''.format(self.username, self.password)
+        json = run_query(self.url, query)
+        return json['data']['tokenAuth']['token']
+
+    @DeprecationWarning
     def get_score_rank_methods(self, compendium, normalization):
         '''
+        Get available score ranks method to use for specific compendium and normalization
 
+        :param compendium: the compendium name
+        :param normalization: the normalization name
         :return: list of all available score rank methods
         '''
         query = '''
@@ -89,24 +127,25 @@ class Connect:
             }}
         '''.format(compendium=compendium, normalization=normalization)
         json = run_query(self.url, query)
-        return json['data']
+        return json['data']['scoreRankMethods']
 
-    def get_plot_type(self):
+    @DeprecationWarning
+    def get_plot_type(self, compendium, normalization):
         '''
+        Get the available plot type for specific compendium and normalization
 
-        :return: list of all available plot type
+        :param compendium: the compendium name
+        :param normalization: the normalization name
+        :return: list of available plot type
         '''
-        query = "{ plotType }"
+        query = '''
+            {{
+                plotName(compendium:"{compendium}", normalization:"{normalization}") {{
+                    distribution,
+                    heatmap,
+                    network
+                }}
+            }}
+        '''.format(compendium=compendium, normalization=normalization)
         json = run_query(self.url, query)
-        return json['data']
-
-    def _get_token(self):
-        query = '''\
-            mutation {{\
-                tokenAuth(username: "{}", password: "{}") {{\
-                    token\
-                }}\
-            }}\
-        '''.format(self.username, self.password)
-        json = run_query(self.url, query)
-        return json['data']['tokenAuth']['token']
+        return json['data']['plotName']
