@@ -6,6 +6,7 @@
 Welcome to pyCOMPASS's documentation!
 =====================================
 
+pyCOMPASS is a Python interface to `COMPASS <https://compass-.readthedocs.io>`_, the gene expression compendia GraphQL endpoint.
 
 .. toctree::
    :maxdepth: 2
