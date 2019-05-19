@@ -62,6 +62,12 @@ class SampleSet:
 
         return _ss
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
     @staticmethod
     def using(compendium):
         cls = get_compendium_object(SampleSet)

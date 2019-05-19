@@ -32,6 +32,12 @@ class BiologicalFeature:
         return [BiologicalFeature(**dict({'compendium': self.compendium}, **bf))
                 for bf in _get_biological_features(self.compendium, filter=filter, fields=fields)]
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
     @staticmethod
     def using(compendium):
         cls = get_compendium_object(BiologicalFeature)

@@ -3,71 +3,132 @@ from pycompass.query import run_query
 
 class Plot:
 
-    def get_plot(self, type=None, format='html', **kwargs):
+    def __init__(self, module):
+        self.module = module
+        self.plot_types = None
+
+        query = '''
+            {{
+              plotName(compendium:"{compendium}", normalization:"{normalization}") {{
+                distribution,
+                heatmap,
+                network
+              }}
+            }}
+        '''.format(compendium=self.module.compendium.compendium_name, normalization=self.module.normalization)
+        self.plot_types = run_query(self.module.compendium.connection.url, query)['data']['plotName']
+
+    def plot_heatmap(self, plot_type=None, output_format='html', *args, **kwargs):
         '''
-        Plot the module
+        Get the HTML or JSON code that plot module heatmaps
 
-        :param type: the plot type
-        :param format: html or json
-        :return: the plot in the specified format
+        :param plot_type: the plot type
+        :param output_format: html or json
+        :return: str
         '''
+        if plot_type is None:
+            plot_type = self.plot_types['heatmap'][0]
+        if plot_type not in self.plot_types['heatmap']:
+            raise Exception('Invalid plot type. Options are ' + ','.join(self.plot_types['heatmap']))
+        _options = []
+        for k, v in kwargs.items():
+            _v = str(v)
+            if type(v) == str:
+                _v = '"' + str(v) + '"'
+            elif type(v) == bool:
+                _v = str(v).lower()
+            _options.append(str(k) + ':' + _v)
+        options = ',' if len(_options) > 0 else ''
+        options += ','.join(_options)
+        query = '''
+            {{
+                plotHeatmap(compendium:"{compendium}", plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
+                samplesetIds:[{samplesets}] {options}) {{
+                    {output}
+                }}
+            }}
+        '''.format(compendium=self.module.compendium.compendium_name,
+                   plot_type=plot_type,
+                   output=output_format,
+                   options=options,
+                   biofeatures='"' + '","'.join([bf.id for bf in self.module.biological_features]) + '"',
+                   samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"')
+        json = run_query(self.module.compendium.connection.url, query)
+        return json['data']['plotHeatmap'][output_format]
 
-        base = 'plotDistribution'
-        base_query = '''\
-                {{\
-                    {base}(compendium:"{compendium}",
-                    plotType:"{plot_type}" 
-                    {normalization} {filter}) {{\
-                        {output}\
-                    }}\
-                }}\
-                '''
-        if type == 'sample_sets_magnitude_distribution':
-            base = 'plotDistribution'
-            query = base_query.format(
-                base=base,
-                compendium=self._compendium.compendium_name,
-                plot_type=type,
-                normalization=', normalization:"' + self._normalization + '"',
-                filter=', biofeaturesIds:[' + ','.join(['"' + x + '"' for x in self._biological_features]) + ']',
-                output=format
-            )
-        elif type == 'sample_sets_coexpression_distribution':
-            base = 'plotDistribution'
-            query = base_query.format(
-                base=base,
-                compendium=self._compendium.compendium_name,
-                plot_type=type,
-                normalization=', normalization:"' + self._normalization + '"',
-                filter=', biofeaturesIds:[' + ','.join(['"' + x + '"' for x in self._biological_features]) + ']',
-                output=format
-            )
-        elif type == 'biological_features_standard_deviation_distribution':
-            base = 'plotDistribution'
-            query = base_query.format(
-                base=base,
-                compendium=self._compendium.compendium_name,
-                plot_type=type,
-                normalization=', normalization:"' + self._normalization + '"',
-                filter=', samplesetIds:[' + ','.join(['"' + x + '"' for x in self._sample_sets]) + ']',
-                output=format
-            )
-        elif type == 'module_heatmap_expression':
-            base = 'plotHeatmap'
-            sort_by = ', sortBy:"{}"'.format(kwargs['sort_by']) if 'sort_by' in kwargs else ''
-            alternative_coloring_value = 'true' if bool(kwargs.get('alternative_coloring', False)) else 'false'
-            alternative_coloring = ', alternativeColoring:{}'.format(alternative_coloring_value)
-            query = base_query.format(
-                base=base,
-                compendium=self._compendium.compendium_name,
-                plot_type=type,
-                normalization='',
-                filter=', biofeaturesIds:[' + ','.join(['"' + x + '"' for x in self._biological_features]) + '] '
-                       ', samplesetIds:[' + ','.join(['"' + x + '"' for x in self._sample_sets]) + '] ' +
-                       sort_by + alternative_coloring,
-                output=format
-            )
+    def plot_network(self, plot_type=None, output_format='html', *args, **kwargs):
+        '''
+        Get the HTML or JSON code that plot the module networks
 
-        return run_query(self._compendium.connection.url, query)['data'][base][format]
+        :param plot_type: the plot type
+        :param output_format: html or json
+        :return: str
+        '''
+        if plot_type is None:
+            plot_type = self.plot_types['network'][0]
+        if plot_type not in self.plot_types['network']:
+            raise Exception('Invalid plot type. Options are ' + ','.join(self.plot_types['network']))
+        _options = []
+        for k, v in kwargs.items():
+            _v = str(v)
+            if type(v) == str:
+                _v = '"' + str(v) + '"'
+            elif type(v) == bool:
+                _v = str(v).lower()
+            _options.append(str(k) + ':' + _v)
+        options = ',' if len(_options) > 0 else ''
+        options += ','.join(_options)
+        query = '''
+            {{
+                plotNetwork(compendium:"{compendium}", plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
+                samplesetIds:[{samplesets}] {options}) {{
+                    {output}
+                }}
+            }}
+        '''.format(compendium=self.module.compendium.compendium_name,
+                   plot_type=plot_type,
+                   output=output_format,
+                   options=options,
+                   biofeatures='"' + '","'.join([bf.id for bf in self.module.biological_features]) + '"',
+                   samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"')
+        json = run_query(self.module.compendium.connection.url, query)
+        return json['data']['plotNetwork'][output_format]
 
+    def plot_distribution(self, plot_type, output_format='html', *args, **kwargs):
+        '''
+        Get the HTML or JSON code that plot module distributions
 
+        :param plot_type: the plot type
+        :param output_format: html or json
+        :return: str
+        '''
+        if plot_type is None:
+            plot_type = self.plot_types['distribution'][0]
+        if plot_type not in self.plot_types['distribution']:
+            raise Exception('Invalid plot type. Options are ' + ','.join(self.plot_types['distribution']))
+        _options = []
+        for k, v in kwargs.items():
+            _v = str(v)
+            if type(v) == str:
+                _v = '"' + str(v) + '"'
+            elif type(v) == bool:
+                _v = str(v).lower()
+            _options.append(str(k) + ':' + _v)
+        options = ',' if len(_options) > 0 else ''
+        options += ','.join(_options)
+        query = '''
+            {{
+                plotDistribution(compendium:"{compendium}", plotType:"{plot_type}", normalization:"{normalization}", biofeaturesIds:[{biofeatures}],
+                samplesetIds:[{samplesets}] {options}) {{
+                    {output}
+                }}
+            }}
+        '''.format(compendium=self.module.compendium.compendium_name,
+                   plot_type=plot_type,
+                   output=output_format,
+                   normalization=self.module.normalization,
+                   options=options,
+                   biofeatures='"' + '","'.join([bf.id for bf in self.module.biological_features]) + '"',
+                   samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"')
+        json = run_query(self.module.compendium.connection.url, query)
+        return json['data']['plotDistribution'][output_format]
