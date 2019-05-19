@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pyCOMPASS",
-    version="0.1.1",
+    version="0.1.2",
     author="Marco Moretto",
     author_email="marco.moretto@fmach.it",
     description="A Python interface to COMPASS, the gene expression compendia GraphQL endpoint",
