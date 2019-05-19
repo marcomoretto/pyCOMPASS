@@ -1,11 +1,11 @@
 # pyCOMPASS>_
-pyCOMPASS
+pyCOMPASS is a Python interface to COMPASS, the gene expression compendia GraphQL endpoint
 
 
 
 ## Documentation
 
-<TODO>
+The full documentation is hosted on [ReadTheDocs](https://pycompass.readthedocs.io)
 
 
 ## License
