@@ -26,18 +26,18 @@ def query_getter(base, default_fields, *args_, **kwargs_):
             filter_string = ''
             if 'filter' in kwargs and kwargs['filter']:
                 flt = []
-                correct_quotes = False
                 for k, v in kwargs['filter'].items():
                     if type(v) == str:
                         flt.append(k + ':"' + v + '"')
                     elif type(v) == bool:
                         flt.append(k + ':' + str(v).lower())
                     else:
-                        flt.append(k + ':' + str(v))
-                        correct_quotes = True
+                        if k.endswith('_In'):
+                            flt.append(k + ':"' + ','.join([str(e) for e in v]) + '"')
+                            flt[-1] = flt[-1].replace("'", '')
+                        else:
+                            flt.append(k + ':' + str(v).replace("'", '"'))
                 filter_string = ',' + ' '.join(flt)
-                if correct_quotes:
-                    filter_string = filter_string.replace("'", '"')
             if 'fields' in kwargs and kwargs['fields']:
                 if type(kwargs['fields']) != list:
                     raise Exception('fields must be a list')
