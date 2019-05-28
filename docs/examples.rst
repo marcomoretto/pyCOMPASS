@@ -12,7 +12,7 @@ Connect
   Connect to a COMPASS GraphQL endpoint and retrieve
   all available compendium as a list of Compendium objects
   '''
-  from pycompass import Connect, Compendium, Module
+  from pycompass import Connect, Compendium, Module, Sample, Platform, Experiment, Ontology, SampleSet, Module
 
   url = 'http://compass.fmach.it/graphql'
   conn = Connect(url)
