@@ -20,9 +20,6 @@ def query_getter(base, default_fields, *args_, **kwargs_):
     def actual_decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            headers = None
-            if self.connection and self.connection.__token__:
-                headers = {"Authorization": "JWT " + self.connection.__token__}
             filter_string = ''
             if 'filter' in kwargs and kwargs['filter']:
                 flt = []
@@ -46,7 +43,7 @@ def query_getter(base, default_fields, *args_, **kwargs_):
                 fields_string = ','.join(default_fields)
             query = '''\
                         {{\
-                            {base}(compendium:"{compendium}" {filter}) {{\
+                            {base}(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}" {filter}) {{\
                                 edges {{\
                                     node {{\
                                         {fields}\
@@ -54,8 +51,14 @@ def query_getter(base, default_fields, *args_, **kwargs_):
                                 }}\
                             }}\
                         }}\
-                    '''.format(base=base, compendium=self.compendium_name, filter=filter_string, fields=fields_string)
-            json = run_query(self.connection.url, query, headers=headers)
+                    '''.format(base=base,
+                               compendium=self.compendium_name,
+                               version=self.version,
+                               database=self.database,
+                               normalization=self.normalization,
+                               filter=filter_string,
+                               fields=fields_string)
+            json = run_query(self.connection.url, query)
             if 'errors' in json:
                 raise ValueError(json['errors'])
             return [e['node'] for e in json['data'][base]['edges']]

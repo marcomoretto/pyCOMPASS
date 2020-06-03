@@ -28,5 +28,5 @@ class Platform:
 
     @staticmethod
     def using(compendium):
-        cls = get_compendium_object(Platform)
+        cls = get_compendium_object(Platform, aggregate_class='platforms')
         return cls(compendium=compendium)

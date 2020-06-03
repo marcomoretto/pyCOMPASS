@@ -4,107 +4,115 @@ from pycompass.query import run_query
 
 class Connect:
 
-    def __init__(self, url, username=None, password=None):
+    def __init__(self, url):
         '''
-        Connect class is used to get a connection to a valid COMPASS GraphQL endpoint. If username and password are
-        provided, it will be possible to store and manage Modules on the server
+        Connect class is used to get a connection to a valid COMPASS GraphQL endpoint.
 
         :param url: the COMPASS GraphQL endpoint URL
-        :param username: the username
-        :param password: the password
         '''
 
         self.url = url
-        self.__token__ = None
-        self.username = username
-        self.password = password
-        self.login(username, password)
 
-    def login(self, username=None, password=None):
+    def get_compass_version(self):
         '''
-        Login
+        Get current backend version
 
-        :param username:
-        :param password:
-        :return:
+        :return: String
         '''
-
-        self.username = username
-        self.password = password
-        if self.username and self.password:
-            self.__token__ = self.__get_token__()
-
-    def signup(self, username=None, email=None, password=None):
-        '''
-        Signup as new user
-
-        :param username: the username
-        :param email: the user email
-        :param password: the password
-        :return: ok if the user has been added
-        '''
-        query = '''\
-            mutation {{\
-                {base}(username:"{username}", email:"{email}", password:"{password}") {{\
-                    {fields}\
-                }}\
-            }}\
-        '''.format(base='signup',
-                   username=username,
-                   email=email,
-                   password=password,
-                   fields='ok'
-                   )
+        query = '''{
+            version
+        }'''
         json = run_query(self.url, query)
-        self.login(username, password)
-        return True
+        return json['data']['version']
 
-    def get_compendium(self, name):
+    def describe_compendia(self):
+        '''
+        Get all available compendia
+
+        :return: dict of compendia structure
+        '''
+        query = '''{
+                    compendia {
+                        name,
+                        fullName,
+                        defaultVersion,
+                        description,
+                        versions {
+                            versionNumber,
+                            versionAlias,
+                            defaultDatabase,
+                            databases {
+                                name,
+                                normalizations
+                            }
+                        }
+                      }
+                }'''
+        json = run_query(self.url, query)
+        return json['data']
+
+    def get_compendium(self, name, version=None, database=None, normalization=None):
         '''
         Get a compendium by a given name, None otherwise
 
         :param name: the compendium name
+        :param version: the compendium version (use default if None)
+        :param database: the compendium database (use default if None)
+        :param normalization: the compendium normalization (use default if None)
         :return: Compendium object
         '''
-        for c in self.get_compendia():
-            if c.compendium_name == name:
-                return c
-        return None
-
-    def get_compendia(self):
-        '''
-        Get all available compendia
-
-        :return: list of Compendium objects
-        '''
         query = '''{
-          compendia {
-            name,
-            fullName,
-            description,
-            normalization
-          }
+            compendia {
+                name,
+                fullName,
+                defaultVersion,
+                description,
+                versions {
+                    versionNumber,
+                    versionAlias,
+                    defaultDatabase,
+                    databases {
+                        name,
+                        normalizations
+                    }
+                }
+              }
         }'''
         json = run_query(self.url, query)
-        compendia = []
         for c in json['data']['compendia']:
+            _version = None
+            _version_alias = None
+            _database = None
+            _normalization = None
+            for v in c['versions']:
+                if version == str(v['versionNumber']) or version == str(v['versionAlias']):
+                    _version = str(v['versionNumber'])
+                    _version_alias = str(v['versionAlias'])
+                elif str(v['versionNumber']) == str(c['defaultVersion']) and version is None:
+                    _version = str(v['versionNumber'])
+                    _version_alias = str(v['versionAlias'])
+                else:
+                    continue
+                if database is None:
+                    _database = v['defaultDatabase']
+                else:
+                    _database = database
+                for d in v['databases']:
+                    if d['name'] == _database:
+                        if normalization is None:
+                            for n in d['normalizations']:
+                                _normalization = n.replace('(default)', '').strip()
+                        else:
+                            _normalization = normalization
+
             comp = pycompass.Compendium.__factory_build_object__(
                 compendium_name=c['name'],
-                connection=self,
                 compendium_full_name=c['fullName'],
                 description=c['description'],
-                normalization=c['normalization']
+                version=_version,
+                version_alias=_version_alias,
+                database=_database,
+                normalization=_normalization,
+                connection=self,
             )
-            compendia.append(comp)
-        return compendia
-
-    def __get_token__(self):
-        query = '''\
-            mutation {{\
-                tokenAuth(username: "{}", password: "{}") {{\
-                    token\
-                }}\
-            }}\
-        '''.format(self.username, self.password)
-        json = run_query(self.url, query)
-        return json['data']['tokenAuth']['token']
+            return comp

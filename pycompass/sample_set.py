@@ -36,9 +36,12 @@ class SampleSet:
 
         :return: list of SampleSet objects
         '''
+        filter = {}
         if 'samples' in kwargs:
-            filter = {'samples': [s.id for s in kwargs['samples']]}
-            return self.get(filter=filter)
+            filter['samples'] = [s.id for s in kwargs['samples']]
+        if 'normalization' in kwargs:
+            filter['normalization'] = kwargs['normalization']
+        return self.get(filter=filter)
 
     def get(self, filter=None, fields=None):
         '''
@@ -70,5 +73,5 @@ class SampleSet:
 
     @staticmethod
     def using(compendium):
-        cls = get_compendium_object(SampleSet)
+        cls = get_compendium_object(SampleSet, aggregate_class='sampleSets')
         return cls(compendium=compendium)

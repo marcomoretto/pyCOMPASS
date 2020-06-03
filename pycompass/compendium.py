@@ -14,12 +14,13 @@ class Compendium(metaclass=get_factory(new__init__)):
 
     def __init__(self, *args, **kwargs):
         self.compendium_name = kwargs['compendium_name']
-        self.connection = kwargs['connection']
         self.compendium_full_name = kwargs['compendium_full_name']
         self.description = kwargs['description']
-        self.normalization = {}
-        for n in kwargs['normalization']:
-            self.normalization[n] = self.__get_score_rank_methods__(n)
+        self.version = kwargs['version']
+        self.version_alias = kwargs['version_alias']
+        self.database = kwargs['database']
+        self.normalization = kwargs['normalization']
+        self.connection = kwargs['connection']
 
         return self
 
@@ -58,16 +59,22 @@ class Compendium(metaclass=get_factory(new__init__)):
         :return:
         '''
         bf = [_bf.id for _bf in module.biological_features]
+        rank = '' if not rank_method else 'rank:"{r}", '.format(r=rank_method)
         query = '''
             {{
-                ranking(compendium:"{compendium}", normalization:"{normalization}", rank:"{rank}", 
+                ranking(compendium:"{compendium}", version:"{version}", database:"{database}", rankTarget: "samplesets", 
+                        normalization:"{normalization}", {rank} 
                         biofeaturesIds:[{biofeatures}]) {{
                             id,
                             name,
                             value
             }}
         }}
-        '''.format(compendium=self.compendium_name, normalization=module.normalization, rank=rank_method,
+        '''.format(compendium=self.compendium_name,
+                   version=self.version,
+                   database=self.database,
+                   normalization=self.normalization,
+                   rank=rank,
                    biofeatures='"' + '","'.join(bf) + '"')
         json = run_query(self.connection.url, query)
         r = json['data']
@@ -86,17 +93,29 @@ class Compendium(metaclass=get_factory(new__init__)):
         :param cutoff:
         :return:
         '''
-        ss = [ss.id for ss in module.sample_sets]
+        bf = []
+        ss = []
+        if module.biological_features:
+            bf = [_bf.id for _bf in module.biological_features]
+        if module.sample_sets:
+            ss = [ss.id for ss in module.sample_sets]
+        rank = '' if not rank_method else 'rank:"{r}", '.format(r=rank_method)
         query = '''
             {{
-                ranking(compendium:"{compendium}", normalization:"{normalization}", rank:"{rank}", 
-                        samplesetIds:[{sample_set}]) {{
+                ranking(compendium:"{compendium}", version:"{version}", database:"{database}", rankTarget: "biofeatures",
+                        normalization:"{normalization}", {rank} 
+                        samplesetIds:[{sample_set}], biofeaturesIds:[{biofeatures}]) {{
                             id,
                             name,
                             value
             }}
         }}
-        '''.format(compendium=self.compendium_name, normalization=module.normalization, rank=rank_method,
+        '''.format(compendium=self.compendium_name,
+                   version=self.version,
+                   database=self.database,
+                   normalization=self.normalization,
+                   rank=rank,
+                   biofeatures='"' + '","'.join(bf) + '"',
                    sample_set='"' + '","'.join(ss) + '"')
         json = run_query(self.connection.url, query)
         r = json['data']
@@ -107,14 +126,25 @@ class Compendium(metaclass=get_factory(new__init__)):
             r['ranking']['value'] = itemgetter(*idxs)(r['ranking']['value'])
         return r
 
-    def __get_score_rank_methods__(self, normalization):
+    def get_score_rank_methods(self):
+        '''
+        Get all the available ranking methods for biological features and sample sets
+
+        :return:
+        '''
+        return self.__get_score_rank_methods__()['scoreRankMethods']
+
+    def __get_score_rank_methods__(self):
         query = '''
             {{
-              scoreRankMethods(compendium:"{compendium}", normalization:"{normalization}") {{
+              scoreRankMethods(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}") {{
                 sampleSets,
                 biologicalFeatures
               }}
             }}
-        '''.format(compendium=self.compendium_name, normalization=normalization)
+        '''.format(compendium=self.compendium_name,
+                   version=self.version,
+                   database=self.database,
+                   normalization=self.normalization)
         json = run_query(self.connection.url, query)
         return json['data']

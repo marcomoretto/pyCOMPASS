@@ -1,6 +1,6 @@
 from pycompass.experiment import Experiment
 from pycompass.platform import Platform
-from pycompass.query import query_getter
+from pycompass.query import query_getter, run_query
 from pycompass.utils import get_compendium_object
 
 
@@ -36,6 +36,25 @@ class Sample:
         elif 'platform' in kwargs:
             filter = {'platform_PlatformAccessId': kwargs['platform'].platformAccessId}
             return self.get(filter=filter)
+        elif 'sparql' in kwargs:
+            sparql = kwargs['sparql']
+            query = '''{{
+                sparql(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                    query:"{query}", target:"sample") {{
+                    rdfTriples
+              }}
+            }}'''.format(compendium=self.compendium.compendium_name,
+                         version=self.compendium.version,
+                         database=self.compendium.database,
+                         normalization=self.compendium.normalization,
+                         query=sparql)
+            json = run_query(self.compendium.connection.url, query)
+            ids = set()
+            for triple in json['data']['sparql']['rdfTriples']:
+                ids.update(triple)
+            ids.remove(None)
+            filter = {'id_In': list(ids)}
+            return self.get(filter=filter)
         else:
             return []
 
@@ -55,5 +74,5 @@ class Sample:
 
     @staticmethod
     def using(compendium):
-        cls = get_compendium_object(Sample)
+        cls = get_compendium_object(Sample, aggregate_class='samples')
         return cls(compendium=compendium)

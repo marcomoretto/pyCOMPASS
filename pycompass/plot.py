@@ -9,14 +9,35 @@ class Plot:
 
         query = '''
             {{
-              plotName(compendium:"{compendium}", normalization:"{normalization}") {{
-                distribution,
+              plotName(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}") {{
                 heatmap,
                 network
               }}
             }}
-        '''.format(compendium=self.module.compendium.compendium_name, normalization=self.module.normalization)
+        '''.format(compendium=self.module.compendium.compendium_name,
+                   version=self.module.compendium.version,
+                   database=self.module.compendium.database,
+                   normalization=self.module.compendium.normalization)
         self.plot_types = run_query(self.module.compendium.connection.url, query)['data']['plotName']
+
+        query = '''
+                    {{
+                      plotName(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}") {{
+                        distribution
+                      }}
+                    }}
+                '''.format(compendium=self.module.compendium.compendium_name,
+                           version=self.module.compendium.version,
+                           database=self.module.compendium.database,
+                           normalization=self.module.compendium.normalization)
+        pt = run_query(self.module.compendium.connection.url, query)['data']['plotName']['distribution']
+        self.plot_types['distribution'] = []
+        if len(pt):
+            self.plot_rank_name = {}
+            for p in pt:
+                self.plot_types['distribution'].append(p[0])
+                self.plot_rank_name[p[0]] = p[1]
+
 
     def plot_heatmap(self, plot_type=None, output_format='html', *args, **kwargs):
         '''
@@ -42,12 +63,15 @@ class Plot:
         options += ','.join(_options)
         query = '''
             {{
-                plotHeatmap(compendium:"{compendium}", plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
-                samplesetIds:[{samplesets}] {options}) {{
+                plotHeatmap(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}", plotType:"{plot_type}",
+                biofeaturesIds:[{biofeatures}], samplesetIds:[{samplesets}] {options}) {{
                     {output}
                 }}
             }}
         '''.format(compendium=self.module.compendium.compendium_name,
+                   version=self.module.compendium.version,
+                   database=self.module.compendium.database,
+                   normalization=self.module.compendium.normalization,
                    plot_type=plot_type,
                    output=output_format,
                    options=options,
@@ -80,12 +104,16 @@ class Plot:
         options += ','.join(_options)
         query = '''
             {{
-                plotNetwork(compendium:"{compendium}", plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
+                plotNetwork(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
                 samplesetIds:[{samplesets}] {options}) {{
                     {output}
                 }}
             }}
         '''.format(compendium=self.module.compendium.compendium_name,
+                   version=self.module.compendium.version,
+                   database=self.module.compendium.database,
+                   normalization=self.module.compendium.normalization,
                    plot_type=plot_type,
                    output=output_format,
                    options=options,
@@ -94,7 +122,7 @@ class Plot:
         json = run_query(self.module.compendium.connection.url, query)
         return json['data']['plotNetwork'][output_format]
 
-    def plot_distribution(self, plot_type, output_format='html', *args, **kwargs):
+    def plot_distribution(self, plot_type, output_format='html', get_rank=True, *args, **kwargs):
         '''
         Get the HTML or JSON code that plot module distributions
 
@@ -116,19 +144,35 @@ class Plot:
             _options.append(str(k) + ':' + _v)
         options = ',' if len(_options) > 0 else ''
         options += ','.join(_options)
+        rank = '''
+            , ranking
+                {
+                    id,
+                    type,
+                    name,
+                    value
+                }
+        '''
+        if not get_rank:
+            rank = ''
         query = '''
             {{
-                plotDistribution(compendium:"{compendium}", plotType:"{plot_type}", normalization:"{normalization}", biofeaturesIds:[{biofeatures}],
+                plotDistribution(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                plotType:"{plot_type}", biofeaturesIds:[{biofeatures}],
                 samplesetIds:[{samplesets}] {options}) {{
                     {output}
+                    {rank}
                 }}
             }}
         '''.format(compendium=self.module.compendium.compendium_name,
+                   version=self.module.compendium.version,
+                   database=self.module.compendium.database,
+                   normalization=self.module.compendium.normalization,
                    plot_type=plot_type,
                    output=output_format,
-                   normalization=self.module.normalization,
                    options=options,
                    biofeatures='"' + '","'.join([bf.id for bf in self.module.biological_features]) + '"',
-                   samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"')
+                   samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"',
+                   rank=rank)
         json = run_query(self.module.compendium.connection.url, query)
         return json['data']['plotDistribution'][output_format]

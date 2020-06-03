@@ -1,15 +1,32 @@
-def get_compendium_object(base):
-    class CompendiumObject(base):
-        def __init__(self, *args, **kwargs):
-            self.compendium = kwargs['compendium']
+from pycompass.aggregate import Aggregate
 
-        def get(self, filter=None, fields=None):
-            return base.get(self, filter=filter, fields=fields)
 
-        def by(self, *args, **kwargs):
-            return base.by(self, *args, **kwargs)
+def get_compendium_object(base, aggregate_class=None):
+    if aggregate_class:
+        class CompendiumObject(base):
+            def __init__(self, *args, **kwargs):
+                self.compendium = kwargs['compendium']
+                self.aggregate = Aggregate(self.compendium, aggregate_class)
 
-    return CompendiumObject
+            def get(self, filter=None, fields=None):
+                return base.get(self, filter=filter, fields=fields)
+
+            def by(self, *args, **kwargs):
+                return base.by(self, *args, **kwargs)
+
+        return CompendiumObject
+    else:
+        class CompendiumObject(base):
+            def __init__(self, *args, **kwargs):
+                self.compendium = kwargs['compendium']
+
+            def get(self, filter=None, fields=None):
+                return base.get(self, filter=filter, fields=fields)
+
+            def by(self, *args, **kwargs):
+                return base.by(self, *args, **kwargs)
+
+        return CompendiumObject
 
 
 def get_factory(new__init__):

@@ -3,6 +3,7 @@ from pycompass.query import query_getter, run_query
 from pycompass.sample_set import SampleSet
 from pycompass.utils import get_compendium_object
 import numpy as np
+import pickle as pk
 
 
 class Module:
@@ -19,129 +20,41 @@ class Module:
     def by(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def get(self, filter=None, fields=None):
+    def write_to_file(self, filename):
         '''
-        Get modules
+        Dump a module into a local file
 
-        :param filter: return results that match only filter values
-        :param fields: return only specific fields
-        :return: list of Module objects
+        :param filename:
+        :return:
         '''
-        @query_getter('searchModules', ['id', 'name'])
-        def _get_modules(obj, filter=None, fields=None):
-            pass
+        obj = {
+            'bfs': [bf.id for bf in self.biological_features],
+            'sss': [ss.id for ss in self.sample_sets],
+            'compendium': self.compendium,
+            'values': self.values
+        }
+        with open(filename, 'wb') as fo:
+            pk.dump(obj, fo)
 
-        def _get_module_details(compendium, name):
-            headers = {"Authorization": "JWT " + compendium.connection.__token__}
-            query = '''\
-                        {{\
-                            {base}(compendium:"{compendium}", name:{name}) {{\
-                                {fields}\
-                            }}\
-                        }}\
-                    '''.format(base='modules', compendium=compendium.compendium_name, name='"' + name + '"',
-                               fields='normalizedValues, ' +
-                                'biofeatures {' +
-                                'edges {' +
-                                'node {' +
-                                'id } } }' +
-                                'sampleSets {' +
-                                'edges {' +
-                                'node {' +
-                                'id } } }'
-                               )
-            json = run_query(compendium.connection.url, query, headers=headers)
-            if 'errors' in json:
-                raise Exception('Module {} does not exist'.format(name))
-            bio_features = [e['node']['id'] for e in json['data']['modules']['biofeatures']['edges']]
-            sample_sets = [e['node']['id'] for e in json['data']['modules']['sampleSets']['edges']]
-            return bio_features, sample_sets
-
-        modules = []
-        for m in _get_modules(self.compendium, filter=filter, fields=fields):
-            module = Module(**dict({'compendium': self.compendium}, **m))
-            _bf, _ss = _get_module_details(self.compendium, module.name)
-            module.sample_sets = SampleSet.using(self.compendium).get(filter={'id_In': str(_ss)})
-            module.biological_features = BiologicalFeature.using(self.compendium).get(filter={'id_In': str(_bf)})
-            module.rank = None
-            module.normalization = module.sample_sets[0].normalization
-            modules.append(module)
-        return modules
-
-    def delete(self):
+    @staticmethod
+    def read_from_file(filename):
         '''
-        Delete current module from the server
+        Read module data from a local file
 
-        :return: boolean
+        :param filename:
+        :return:
         '''
-        headers = {"Authorization": "JWT " + self.compendium.connection.__token__}
-        query = '''\
-                    mutation {{\
-                        {base}(compendium:"{compendium}", name:"{name}") {{\
-                            ok\
-                        }}\
-                    }}\
-        '''.format(base='deleteModule', compendium=self.compendium.compendium_name,
-                   name=self.name,
-                   fields='ok'
-                   )
-        run_query(self.compendium.connection.url, query, headers=headers)
-        self.biological_features = []
-        self.sample_sets = []
-        self.name = None
-        self.id = None
-        self.__normalized_values__ = None
-        return True
+        module = Module()
+        with open(filename, 'rb') as fi:
+            obj = pk.load(fi)
+            if obj:
+                module.compendium = obj['compendium']
+                module.biological_features = BiologicalFeature.using(module.compendium).get(filter={'id_In': obj['bfs']})
+                module.sample_sets = SampleSet.using(module.compendium).get(filter={'id_In': obj['sss']})
+                module.__normalized_values__ = obj['values']
+        return module
 
-    def update_name(self, new_name):
-        '''
-        Update current module's name
-
-        :return: boolean
-        '''
-        headers = {"Authorization": "JWT " + self.compendium.connection.__token__}
-        query = '''\
-                    mutation {{\
-                        {base}(compendium:"{compendium}", oldName:"{old_name}", newName:"{new_name}") {{\
-                            ok\
-                        }}\
-                    }}\
-        '''.format(base='updateModuleName', compendium=self.compendium.compendium_name,
-                   old_name=self.name,
-                   new_name=new_name,
-                   fields='ok'
-                   )
-        run_query(self.compendium.connection.url, query, headers=headers)
-        self.name = new_name
-        return True
-
-    def save(self, name=None):
-        '''
-        Save a module on the server
-
-        :param name: the module name
-        :return: boolean
-        '''
-        if name is not None:
-            self.name = name
-        headers = {"Authorization": "JWT " + self.compendium.connection.__token__}
-        query = '''\
-            mutation {{\
-                {base}(compendium:"{compendium}", name:{name}, biofeaturesIds:[{biofeaturesIds}], samplesetIds:[{samplesetIds}]) {{\
-                    {fields}\
-                }}\
-            }}\
-        '''.format(base='saveModule', compendium=self.compendium.compendium_name,
-                   name='"' + self.name + '"',
-                   biofeaturesIds=','.join(['"' + bf.id + '"' for bf in self.biological_features]),
-                   samplesetIds=','.join(['"' + ss.id + '"' for ss in self.sample_sets]),
-                   fields='ok, id'
-                   )
-        json = run_query(self.compendium.connection.url, query, headers=headers)
-        self.id = json['data']['saveModule']['id']
-        return True
-
-    def create(self, biofeatures=None, samplesets=None, rank=None, cutoff=None, normalization=None):
+    def create(self, biofeatures=None, samplesets=None, rank=None, cutoff=None):
         '''
         Create a new module
 
@@ -169,7 +82,7 @@ class Module:
                 if ss.normalization != norm:
                     raise Exception('You cannot mix SampleSets with different normalization')
             setattr(self, 'normalization', norm)
-            all_ranks = self.compendium.normalization[self.normalization]['scoreRankMethods']['biologicalFeatures']
+            all_ranks = self.compendium.get_score_rank_methods()['biologicalFeatures']
             _rank = rank
             if not rank:
                 _rank = all_ranks[0]
@@ -184,11 +97,7 @@ class Module:
                 filter={'id_In': str(_bf)}
             )
         elif self.sample_sets is None:
-            if normalization:
-                setattr(self, 'normalization', normalization)
-            else:
-                setattr(self, 'normalization', list(self.compendium.normalization.keys())[0])
-            all_ranks = self.compendium.normalization[self.normalization]['scoreRankMethods']['sampleSets']
+            all_ranks = self.compendium.get_score_rank_methods()['sampleSets']
             _rank = rank
             if not rank:
                 _rank = all_ranks[0]
@@ -218,11 +127,14 @@ class Module:
         def _get_normalized_values(filter=None, fields=None):
             query = '''\
                 {{\
-                    {base}(compendium:"{compendium}" {filter}) {{\
+                    {base}(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}" {filter}) {{\
                         {fields}\
                     }}\
                 }}\
             '''.format(base='modules', compendium=self.compendium.compendium_name,
+                       version=self.compendium.version,
+                       database=self.compendium.database,
+                       normalization=self.compendium.normalization,
                        filter=', biofeaturesIds:[' + ','.join(['"' + bf.id + '"' for bf in self.biological_features]) + '],' +
                             'samplesetIds: [' + ','.join(['"' + ss.id + '"' for ss in self.sample_sets]) + ']', fields=fields)
             return run_query(self.compendium.connection.url, query)
@@ -367,27 +279,27 @@ class Module:
         '''
         if not isinstance(first, Module) or not isinstance(second, Module):
             raise Exception('Arguments must be valid Module objects!')
-        if first.compendium != second.compendium:
+        if first.compendium.compendium_name != second.compendium.compendium_name:
             raise Exception('Module objects must be from the same Compendium!')
         if first.normalization != second.normalization:
             raise Exception('Module objects must have the same normalization!')
         compendium = first.compendium
         normalization = first.normalization
-        bf = set(first.biological_features)
-        ss = set(first.sample_sets)
+        bf = set([_bf.id for _bf in first.biological_features])
+        ss = set([_ss.id for _ss in first.sample_sets])
         if biological_features:
-            bf = set.difference(bf, set(second.biological_features))
+            bf = set.difference(bf, set([_bf.id for _bf in second.biological_features]))
             bf = list(bf)
             if len(bf) == 0:
                 raise Exception("There are no biological features in common between these two modules!")
         if sample_sets:
-            ss = set.difference(ss, set(second.sample_sets))
+            ss = set.difference(ss, set([_ss.id for _ss in second.sample_sets]))
             ss = list(ss)
             if len(ss) == 0:
                 raise Exception("There are no sample sets in common between these two modules!")
         m = Module()
-        m.sample_sets = ss
-        m.biological_features = bf
+        m.sample_sets = SampleSet.using(compendium).get(filter={'id_In': ss})
+        m.biological_features = BiologicalFeature.using(compendium).get(filter={'id_In': bf})
         m.compendium = compendium
         m.normalization = normalization
         m.rank = None

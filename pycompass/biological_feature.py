@@ -1,5 +1,5 @@
-from pycompass.query import query_getter
 from pycompass.utils import get_compendium_object
+from pycompass.query import query_getter, run_query
 
 
 class BiologicalFeature:
@@ -15,7 +15,25 @@ class BiologicalFeature:
                 setattr(self, k, v)
 
     def by(self, *args, **kwargs):
-        raise NotImplementedError()
+        if 'sparql' in kwargs:
+            sparql = kwargs['sparql']
+            query = '''{{
+                        sparql(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                            query:"{query}", target:"biofeature") {{
+                            rdfTriples
+                      }}
+                    }}'''.format(compendium=self.compendium.compendium_name,
+                                 version=self.compendium.version,
+                                 database=self.compendium.database,
+                                 normalization=self.compendium.normalization,
+                                 query=sparql)
+            json = run_query(self.compendium.connection.url, query)
+            ids = set()
+            for triple in json['data']['sparql']['rdfTriples']:
+                ids.update(triple)
+            ids.remove(None)
+            filter = {'id_In': list(ids)}
+            return self.get(filter=filter)
 
     def get(self, filter=None, fields=None):
         '''
@@ -40,5 +58,5 @@ class BiologicalFeature:
 
     @staticmethod
     def using(compendium):
-        cls = get_compendium_object(BiologicalFeature)
+        cls = get_compendium_object(BiologicalFeature, aggregate_class='biofeatures')
         return cls(compendium=compendium)

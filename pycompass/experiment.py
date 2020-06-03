@@ -27,5 +27,5 @@ class Experiment:
 
     @staticmethod
     def using(compendium):
-        cls = get_compendium_object(Experiment)
+        cls = get_compendium_object(Experiment, aggregate_class='experiments')
         return cls(compendium=compendium)
