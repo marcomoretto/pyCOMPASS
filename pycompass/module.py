@@ -9,8 +9,8 @@ import pickle as pk
 class Module:
 
     def __init__(self, *args, **kwargs):
-        self.biological_features = []
-        self.sample_sets = []
+        self.biological_features = tuple()
+        self.sample_sets = tuple()
         self.name = None
         self.id = None
         self.__normalized_values__ = None
@@ -67,8 +67,12 @@ class Module:
         '''
         _bf_limit = 50
         _ss_limit = 50
-        self.biological_features = biofeatures
-        self.sample_sets = samplesets
+        self.biological_features = None
+        self.sample_sets = None
+        if biofeatures:
+            self.biological_features = tuple(biofeatures)
+        if samplesets:
+            self.sample_sets = tuple(samplesets)
         self.name = None
         self.id = None
         # check that everything is ok to retrieve the normalized values
@@ -93,9 +97,9 @@ class Module:
             # get first _bf_limit biofeatures automatically
             _bf = self.compendium.rank_biological_features(self, rank_method=_rank, cutoff=cutoff)
             _bf = _bf['ranking']['id'][:_bf_limit]
-            self.biological_features = BiologicalFeature.using(self.compendium).get(
+            self.biological_features = tuple(BiologicalFeature.using(self.compendium).get(
                 filter={'id_In': str(_bf)}
-            )
+            ))
         elif self.sample_sets is None:
             all_ranks = self.compendium.get_score_rank_methods()['sampleSets']
             _rank = rank
@@ -108,9 +112,9 @@ class Module:
             # get first _ss_limit samplesets automatically
             _ss = self.compendium.rank_sample_sets(self, rank_method=_rank, cutoff=cutoff)
             _ss = _ss['ranking']['id'][:_ss_limit]
-            self.sample_sets = SampleSet.using(self.compendium).get(
+            self.sample_sets = tuple(SampleSet.using(self.compendium).get(
                 filter={'id_In': str(_ss)}
-            )
+            ))
         # now we biofeatures and samplesets
         setattr(self, '__normalized_values__', None)
         self.values
@@ -140,8 +144,29 @@ class Module:
             return run_query(self.compendium.connection.url, query)
 
         if self.__normalized_values__ is None or len(self.__normalized_values__) == 0:
-            response = _get_normalized_values(fields="normalizedValues")
+            response = _get_normalized_values(fields='''normalizedValues, biofeatures {
+                          edges {
+                            node {
+                              id
+                            }
+                          }
+                        },
+                        sampleSets {
+                          edges {
+                            node {
+                              id
+                            } 
+                          }
+                        }''')
             self.__normalized_values__ = np.array(response['data']['modules']['normalizedValues'])
+            _ss = [x['node']['id'] for x in response['data']['modules']['sampleSets']['edges']]
+            _bf = [x['node']['id'] for x in response['data']['modules']['biofeatures']['edges']]
+            self.sample_sets = SampleSet.using(self.compendium).get(
+                filter={'id_In': str(_ss)}
+            )
+            self.biological_features = BiologicalFeature.using(self.compendium).get(
+                filter={'id_In': str(_bf)}
+            )
         return self.__normalized_values__
 
     def add_biological_features(self, biological_features=[]):
