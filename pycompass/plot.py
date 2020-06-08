@@ -1,4 +1,6 @@
 from pycompass.query import run_query
+from pycompass.biological_feature import BiologicalFeature
+from pycompass.sample_set import SampleSet
 
 
 class Plot:
@@ -65,7 +67,13 @@ class Plot:
             {{
                 plotHeatmap(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}", plotType:"{plot_type}",
                 biofeaturesIds:[{biofeatures}], samplesetIds:[{samplesets}] {options}) {{
-                    {output}
+                    {output},
+                    sortedSamplesets {
+                      id
+                    },
+                    sortedBiofeatures {
+                      id
+                    }
                 }}
             }}
         '''.format(compendium=self.module.compendium.compendium_name,
@@ -78,7 +86,11 @@ class Plot:
                    biofeatures='"' + '","'.join([bf.id for bf in self.module.biological_features]) + '"',
                    samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"')
         json = run_query(self.module.compendium.connection.url, query)
-        return json['data']['plotHeatmap'][output_format]
+        bf = [x['id'] for x in json['data']['plotHeatmap']['sortedBiofeatures']]
+        ss = [x['id'] for x in json['data']['plotHeatmap']['sortedSamplesets']]
+        sorted_bf = BiologicalFeature.using(self.compendium).get(filter={'id_In': bf})
+        sorted_ss = SampleSet.using(self.compendium).get(filter={'id_In': ss})
+        return json['data']['plotHeatmap'][output_format], sorted_bf, sorted_ss
 
     def plot_network(self, plot_type=None, output_format='html', *args, **kwargs):
         '''
