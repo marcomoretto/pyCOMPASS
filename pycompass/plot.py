@@ -68,12 +68,12 @@ class Plot:
                 plotHeatmap(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}", plotType:"{plot_type}",
                 biofeaturesIds:[{biofeatures}], samplesetIds:[{samplesets}] {options}) {{
                     {output},
-                    sortedSamplesets {
+                    sortedSamplesets {{
                       id
-                    },
-                    sortedBiofeatures {
+                    }},
+                    sortedBiofeatures {{
                       id
-                    }
+                    }}
                 }}
             }}
         '''.format(compendium=self.module.compendium.compendium_name,
