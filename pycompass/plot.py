@@ -88,8 +88,8 @@ class Plot:
         json = run_query(self.module.compendium.connection.url, query)
         bf = [x['id'] for x in json['data']['plotHeatmap']['sortedBiofeatures']]
         ss = [x['id'] for x in json['data']['plotHeatmap']['sortedSamplesets']]
-        sorted_bf = BiologicalFeature.using(self.compendium).get(filter={'id_In': bf})
-        sorted_ss = SampleSet.using(self.compendium).get(filter={'id_In': ss})
+        sorted_bf = BiologicalFeature.using(self.module.compendium).get(filter={'id_In': bf})
+        sorted_ss = SampleSet.using(self.module.compendium).get(filter={'id_In': ss})
         return json['data']['plotHeatmap'][output_format], sorted_bf, sorted_ss
 
     def plot_network(self, plot_type=None, output_format='html', *args, **kwargs):
