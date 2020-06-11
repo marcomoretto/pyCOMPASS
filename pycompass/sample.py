@@ -5,6 +5,9 @@ from pycompass.utils import get_compendium_object
 
 
 class Sample:
+    '''
+    The Sample class
+    '''
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():

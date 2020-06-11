@@ -3,14 +3,11 @@ from pycompass.query import run_query
 
 
 class Connect:
+    '''
+    Connect class is used to get a connection to a valid COMPASS GraphQL endpoint.
+    '''
 
     def __init__(self, url):
-        '''
-        Connect class is used to get a connection to a valid COMPASS GraphQL endpoint.
-
-        :param url: the COMPASS GraphQL endpoint URL
-        '''
-
         self.url = url
 
     def get_compass_version(self):

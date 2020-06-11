@@ -31,6 +31,16 @@ Module Class
    :members:
 
 
+Annotation Class
+-----------------------
+
+.. automodule:: pycompass.annotation
+    :members:
+
+.. autoclass:: Annotation
+   :members:
+
+
 BiologicalFeature Class
 -----------------------
 

@@ -11,6 +11,11 @@ def new__init__(self, *args, **kwargs):
 
 
 class Compendium(metaclass=get_factory(new__init__)):
+    '''
+    A Compendium object holds all the necessary information used to retrieve Experiments, Samples, BiologicalFeature objects, such as
+    the compendium name, the version to be used as well as the Connection object
+    '''
+
 
     def __init__(self, *args, **kwargs):
         self.compendium_name = kwargs['compendium_name']

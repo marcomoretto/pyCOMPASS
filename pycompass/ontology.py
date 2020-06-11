@@ -4,6 +4,9 @@ import json
 
 
 class Ontology:
+    '''
+    Ontology class represent the different ontologies used to annotate BiologicalFeature and Sample objects
+    '''
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():

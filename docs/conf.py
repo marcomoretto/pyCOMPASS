@@ -24,9 +24,9 @@ copyright = '2019, Marco Moretto'
 author = 'Marco Moretto'
 
 # The short X.Y version
-version = pycompass.__version__
+version = '0.5'
 # The full version, including alpha/beta/rc tags
-release = pycompass.__version__
+release = '0.5'
 
 import os
 import sys

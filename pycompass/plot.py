@@ -4,6 +4,9 @@ from pycompass.sample_set import SampleSet
 
 
 class Plot:
+    '''
+    The Plot class wraps a module and provides different methods to plot it
+    '''
 
     def __init__(self, module):
         self.module = module
@@ -88,8 +91,10 @@ class Plot:
         json = run_query(self.module.compendium.connection.url, query)
         bf = [x['id'] for x in json['data']['plotHeatmap']['sortedBiofeatures']]
         ss = [x['id'] for x in json['data']['plotHeatmap']['sortedSamplesets']]
-        sorted_bf = BiologicalFeature.using(self.module.compendium).get(filter={'id_In': bf})
-        sorted_ss = SampleSet.using(self.module.compendium).get(filter={'id_In': ss})
+
+        sorted_bf = [tuple for x in bf for tuple in self.module.biological_features if tuple.id == x]
+        sorted_ss = [tuple for x in ss for tuple in self.module.sample_sets if tuple.id == x]
+
         return json['data']['plotHeatmap'][output_format], sorted_bf, sorted_ss
 
     def plot_network(self, plot_type=None, output_format='html', *args, **kwargs):
@@ -134,7 +139,7 @@ class Plot:
         json = run_query(self.module.compendium.connection.url, query)
         return json['data']['plotNetwork'][output_format]
 
-    def plot_distribution(self, plot_type, output_format='html', get_rank=True, *args, **kwargs):
+    def plot_distribution(self, plot_type, output_format='html', get_rank=False, *args, **kwargs):
         '''
         Get the HTML or JSON code that plot module distributions
 
@@ -160,7 +165,6 @@ class Plot:
             , ranking
                 {
                     id,
-                    type,
                     name,
                     value
                 }
@@ -187,4 +191,6 @@ class Plot:
                    samplesets='"' + '","'.join([ss.id for ss in self.module.sample_sets]) + '"',
                    rank=rank)
         json = run_query(self.module.compendium.connection.url, query)
+        if get_rank:
+            return json['data']['plotDistribution'][output_format], json['data']['plotDistribution']['ranking']
         return json['data']['plotDistribution'][output_format]

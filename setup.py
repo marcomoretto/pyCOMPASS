@@ -20,7 +20,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        'requests==2.21.0',
-        'numpy==1.16.0'
+        'requests',
+        'numpy'
     ],
 )

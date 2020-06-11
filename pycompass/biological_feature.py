@@ -3,6 +3,9 @@ from pycompass.query import query_getter, run_query
 
 
 class BiologicalFeature:
+    '''
+    A BiologicalFeature object represent the measured biological entity (tipically gene expression)
+    '''
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():
@@ -15,6 +18,13 @@ class BiologicalFeature:
                 setattr(self, k, v)
 
     def by(self, *args, **kwargs):
+        '''
+        Get BiolgicalFeature list from other high level objects
+
+        :param args:
+        :param kwargs: sparql="SELECT ?s ?p ?o ..."
+        :return:
+        '''
         if 'sparql' in kwargs:
             sparql = kwargs['sparql']
             query = '''{{

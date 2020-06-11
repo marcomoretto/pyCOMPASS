@@ -3,6 +3,9 @@ from pycompass.utils import get_compendium_object
 
 
 class Experiment:
+    '''
+    The Experiment class
+    '''
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():

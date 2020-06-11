@@ -3,6 +3,9 @@ from pycompass.utils import get_compendium_object
 
 
 class Platform:
+    '''
+    The technological platform used to measure the BiologicalFeature in specific Sample
+    '''
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():

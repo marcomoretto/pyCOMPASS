@@ -7,6 +7,9 @@ import pickle as pk
 
 
 class Module:
+    '''
+    A module is a subset of the entire compendium 2D matrix that holds the quantitative values. Rows are BiologicalFeatures and columns are SampleSets
+    '''
 
     def __init__(self, *args, **kwargs):
         self.biological_features = tuple()

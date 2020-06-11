@@ -6,6 +6,9 @@ from pycompass.utils import get_compendium_object
 
 
 class SampleSet:
+    '''
+    A SampleSet class is a iterable class and is composed by a colletion of Sample objects. A SampleSet represent the measured condition.
+    '''
     def __init__(self, s=(), *args, **kwargs):
         self.__samples__ = tuple(s)
         self.__current__ = 0

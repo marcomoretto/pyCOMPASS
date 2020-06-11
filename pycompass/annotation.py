@@ -5,6 +5,10 @@ from pycompass.sample import Sample
 
 
 class Annotation:
+    '''
+    The Annotation class wraps a BiologicalFeature or a Sample object to return its annoation
+    '''
+
     def __init__(self, obj):
         self.compendium = None
         self.obj = obj
@@ -16,6 +20,11 @@ class Annotation:
                 break
 
     def get_triples(self):
+        '''
+        Return the annotation as a list of RDF triples
+
+        :return: list
+        '''
         ids = []
         for o in self.obj:
             if type(o) == BiologicalFeature or type(o) == Sample:
@@ -31,6 +40,12 @@ class Annotation:
         return json['data']['annotationPrettyPrint']['rdfTriples']
 
     def plot_network(self, output_format='html'):
+        '''
+        Return the Cytoscape JS representation of RDF graph used to annotate the BiologialFeature or Sample passed to the Annotation object
+
+        :param output_format: html or json
+        :return:
+        '''
         ids = []
         for o in self.obj:
             if type(o) == BiologicalFeature or type(o) == Sample:
