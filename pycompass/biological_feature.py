@@ -17,6 +17,15 @@ class BiologicalFeature:
             else:
                 setattr(self, k, v)
 
+    def __getattr__(self, name):
+        if name not in self.__dict__:
+            _bf = BiologicalFeature(**dict({'compendium': self.compendium}, **BiologicalFeature.__get_biological_features(self.compendium, filter={'id': self.id})[0]))
+            self.__dict__.update(_bf.__dict__)
+        value = self.__dict__.get(name)
+        if not value:
+            raise AttributeError({self.__class__.__name__} + '.' + name + ' is invalid.')
+        return value
+
     def by(self, *args, **kwargs):
         '''
         Get BiolgicalFeature list from other high level objects
@@ -45,6 +54,13 @@ class BiologicalFeature:
             filter = {'id_In': list(ids)}
             return self.get(filter=filter)
 
+    @query_getter('biofeatures',
+                  ['id', 'name', 'description',
+                   'biofeaturevaluesSet { edges { node { bioFeatureField { name }, value } } }'])
+    @staticmethod
+    def __get_biological_features(obj, filter=None, fields=None):
+        pass
+
     def get(self, filter=None, fields=None):
         '''
         Get biological feature
@@ -53,12 +69,8 @@ class BiologicalFeature:
         :param fields: return only specific fields
         :return: list of BiologicalFeature objects
         '''
-        @query_getter('biofeatures',
-                      ['id', 'name', 'description', 'biofeaturevaluesSet { edges { node { bioFeatureField { name }, value } } }'])
-        def _get_biological_features(obj, filter=None, fields=None):
-            pass
-        return [BiologicalFeature(**dict({'compendium': self.compendium}, **bf))
-                for bf in _get_biological_features(self.compendium, filter=filter, fields=fields)]
+        bf_ids = BiologicalFeature.__get_biological_features(self.compendium, filter=filter, fields=['id', 'name', 'description'])
+        return [BiologicalFeature(**dict({'compendium': self.compendium}, **bf)) for bf in bf_ids]
 
     def __hash__(self):
         return hash(self.id)

@@ -10,4 +10,4 @@ from pycompass.sample import Sample
 from pycompass.sample_set import SampleSet
 from pycompass.annotation import Annotation
 
-__version__ = "0.5.15"
+__version__ = "0.6.5"

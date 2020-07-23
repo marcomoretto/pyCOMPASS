@@ -164,12 +164,14 @@ class Module:
             self.__normalized_values__ = np.array(response['data']['modules']['normalizedValues'])
             _ss = [x['node']['id'] for x in response['data']['modules']['sampleSets']['edges']]
             _bf = [x['node']['id'] for x in response['data']['modules']['biofeatures']['edges']]
-            self.sample_sets = SampleSet.using(self.compendium).get(
+            self.sample_sets = {ss.id:ss for ss in SampleSet.using(self.compendium).get(
                 filter={'id_In': str(_ss)}
-            )
-            self.biological_features = BiologicalFeature.using(self.compendium).get(
+            )}
+            self.sample_sets = [self.sample_sets[i] for i in _ss]
+            self.biological_features = {bf.id:bf for bf in BiologicalFeature.using(self.compendium).get(
                 filter={'id_In': str(_bf)}
-            )
+            )}
+            self.biological_features = [self.biological_features[i] for i in _bf]
         return self.__normalized_values__
 
     def add_biological_features(self, biological_features=[]):
