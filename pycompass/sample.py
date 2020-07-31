@@ -39,6 +39,54 @@ class Sample:
         elif 'platform' in kwargs:
             filter = {'platform_PlatformAccessId': kwargs['platform'].platformAccessId}
             return self.get(filter=filter)
+        elif 'annotationTerm' in kwargs:
+            term = kwargs['annotationTerm']
+            query = '''{{
+              sampleAnnotations(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                annotationTerm:"{term}") {{
+                edges {{
+                  node {{
+                    sample {{
+                      id
+                    }}
+                  }}
+                }}
+              }}
+            }}'''.format(compendium=self.compendium.compendium_name,
+                         version=self.compendium.version,
+                         database=self.compendium.database,
+                         normalization=self.compendium.normalization,
+                         term=term)
+            json = run_query(self.compendium.connection.url, query)
+            ids = set()
+            for n in json['data']['sampleAnnotations']['edges']:
+                ids.add(n['node']['sample']['id'])
+            filter = {'id_In': list(ids)}
+            return self.get(filter=filter)
+        elif 'ontologyId' in kwargs:
+            term = kwargs['ontologyId']
+            query = '''{{
+                          sampleAnnotations(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}",
+                            ontologyId:"{term}") {{
+                            edges {{
+                              node {{
+                                sample {{
+                                  id
+                                }}
+                              }}
+                            }}
+                          }}
+                        }}'''.format(compendium=self.compendium.compendium_name,
+                                     version=self.compendium.version,
+                                     database=self.compendium.database,
+                                     normalization=self.compendium.normalization,
+                                     term=term)
+            json = run_query(self.compendium.connection.url, query)
+            ids = set()
+            for n in json['data']['sampleAnnotations']['edges']:
+                ids.add(n['node']['sample']['id'])
+            filter = {'id_In': list(ids)}
+            return self.get(filter=filter)
         elif 'sparql' in kwargs:
             sparql = kwargs['sparql']
             query = '''{{
