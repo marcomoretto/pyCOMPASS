@@ -4,9 +4,9 @@ from functools import partial, wraps
 
 def run_query(url, query, headers=None):
     if headers:
-        request = requests.post(url, json={'query': query}, headers=headers)
+        request = requests.post(url, json={'query': query}, headers=headers, verify=False)
     else:
-        request = requests.post(url, json={'query': query})
+        request = requests.post(url, json={'query': query}, verify=False)
     if request.status_code == 200:
         json = request.json()
         if 'errors' in json:
