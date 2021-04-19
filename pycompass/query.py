@@ -1,8 +1,11 @@
 import requests
 from functools import partial, wraps
+import sys
 
+__SHOW_GRAPHQL_QUERY__ = False
 
 def run_query(url, query, headers=None):
+    global __SHOW_GRAPHQL_QUERY__
     if headers:
         request = requests.post(url, json={'query': query}, headers=headers, verify=False)
     else:
@@ -11,6 +14,8 @@ def run_query(url, query, headers=None):
         json = request.json()
         if 'errors' in json:
             raise Exception(json['errors'])
+        if __SHOW_GRAPHQL_QUERY__:
+            sys.stderr.write(query)
         return json
     else:
         raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
