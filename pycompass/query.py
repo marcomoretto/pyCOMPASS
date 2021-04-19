@@ -15,7 +15,9 @@ def run_query(url, query, headers=None):
         if 'errors' in json:
             raise Exception(json['errors'])
         if __SHOW_GRAPHQL_QUERY__:
-            sys.stderr.write(query)
+            sys.stderr.write("**** GRAPHQL QUERY BEGIN ***\n")
+            sys.stderr.write(query + "\n")
+            sys.stderr.write("**** GRAPHQL QUERY END ***\n")
         return json
     else:
         raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
