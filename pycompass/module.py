@@ -33,11 +33,21 @@ class Module:
         obj = {
             'bfs': [bf.id for bf in self.biological_features],
             'sss': [ss.id for ss in self.sample_sets],
-            'compendium': self.compendium,
-            'values': self.values
+            'compendium': self.compendium
         }
-        with open(filename, 'wb') as fo:
-            pk.dump(obj, fo)
+        meta_bytes_io = io.BytesIO()
+        values_bytes_io = io.BytesIO(self.values.tobytes())
+        pk.dump(obj, meta_bytes_io)
+        zip_bytes_io = io.BytesIO()
+        with zipfile.ZipFile(zip_bytes_io, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+            for file_name, data in [('__meta__', meta_bytes_io), ('__values__', values_bytes_io)]:
+                zip_file.writestr(file_name, data.getvalue())
+
+        fn = filename
+        if not fn.endswith('.cmf'):
+            fn += '.cmf'
+        with open(fn, 'wb') as f:
+            f.write(zip_bytes_io.getvalue())\
 
     @staticmethod
     def read_from_file(filename):
@@ -47,14 +57,20 @@ class Module:
         :param filename:
         :return:
         '''
+        archive = zipfile.ZipFile(filename, 'r')
+        meta = archive.read('__meta__')
+        values = archive.read('__values__')
+        meta_bytes_io = io.BytesIO(meta)
+        values_bytes_io = io.BytesIO(values)
+        meta_obj = pk.load(meta_bytes_io)
         module = Module()
-        with open(filename, 'rb') as fi:
-            obj = pk.load(fi)
-            if obj:
-                module.compendium = obj['compendium']
-                module.biological_features = BiologicalFeature.using(module.compendium).get(filter={'id_In': obj['bfs']})
-                module.sample_sets = SampleSet.using(module.compendium).get(filter={'id_In': obj['sss']})
-                module.__normalized_values__ = obj['values']
+        module.compendium = meta_obj['compendium']
+        bfs = {bf.id: bf for bf in BiologicalFeature.using(module.compendium).get(filter={'id_In': meta_obj['bfs']})}
+        sss = {ss.id: ss for ss in SampleSet.using(module.compendium).get(filter={'id_In': meta_obj['sss']})}
+        module.biological_features = [bfs[x] for x in meta_obj['bfs']]
+        module.sample_sets = [sss[x] for x in meta_obj['sss']]
+        module.__normalized_values__ = np.reshape(np.frombuffer(values_bytes_io.getvalue()),
+                                                  (len(meta_obj['bfs']), len(meta_obj['sss'])))
         return module
 
     def create(self, biofeatures=None, samplesets=None, rank=None, cutoff=None):
