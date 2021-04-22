@@ -3,7 +3,9 @@ from pycompass.query import query_getter, run_query
 from pycompass.sample_set import SampleSet
 from pycompass.utils import get_compendium_object
 import numpy as np
+import io
 import pickle as pk
+import zipfile
 
 
 class Module:
