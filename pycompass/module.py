@@ -1,3 +1,5 @@
+from pycompass.sample import Sample
+from pycompass.ontology_node import OntologyNode
 from pycompass.biological_feature import BiologicalFeature
 from pycompass.query import query_getter, run_query
 from pycompass.sample_set import SampleSet
@@ -13,12 +15,108 @@ class Module:
     A module is a subset of the entire compendium 2D matrix that holds the quantitative values. Rows are BiologicalFeatures and columns are SampleSets
     '''
 
+    class ModuleDescription:
+
+        class SampleGenerator(object):
+            def __init__(self, gen, length):
+                self.gen = gen
+                self.length = length
+
+            def __len__(self):
+                return self.length
+
+            def __iter__(self):
+                return self.gen
+
+        def __init__(self, module, response):
+            self.module = module
+            self.categories = {}
+            nodes_original_ids = set()
+            for c in response['data']['modules']['samplesDescriptionSummary']:
+                nodes_original_ids.add(c['category'])
+                for c in c['details']:
+                    nodes_original_ids.add(c['originalId'])
+
+            nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
+
+            for c in response['data']['modules']['samplesDescriptionSummary']:
+                cat_node = nodes_map.get(c['category'], None)
+                if cat_node:
+                    self.categories[cat_node] = {}
+                for d in c['details']:
+                    det_node = nodes_map.get(d['originalId'], None)
+                    if det_node:
+                        self.categories[cat_node][det_node] = Module.ModuleDescription.SampleGenerator(self.__sample_generator__(d['samples']), len(d['samples']))
+
+        def __sample_generator__(self, sample_ids):
+            for s in Sample.using(self.module.compendium).get(filter={'id_In': [s['id'] for s in sample_ids]}):
+                yield s
+
+        def __str__(self):
+            f = '{cat_name} ({cat_id}), {d_name} ({d_id}): {n_samples} samples'
+            s = []
+            for c, d in self.categories.items():
+                for cs, ss in d.items():
+                    s.append(f.format(cat_name=c.termShortName, cat_id=c.originalId, d_name=cs.termShortName, d_id=cs.originalId, n_samples=str(len(ss))))
+            return '\n'.join(s)
+
+        def __repr__(self):
+            return self.__str__()
+
+    class ModuleEnrichment:
+
+        def __init__(self, module, response):
+            self.module = module
+            self.sample_categories = {}
+            self.biofeature_categories = {}
+
+            nodes_original_ids = set()
+            for c in response['data']['modules']['samplesetAnnotationEnrichment']:
+                for ot in c['ontologyTerm']:
+                    nodes_original_ids.add(ot['ontologyId'])
+            nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
+            for c in response['data']['modules']['samplesetAnnotationEnrichment']:
+                self.sample_categories[c['ontology']] = {}
+                for ot in c['ontologyTerm']:
+                    node = nodes_map.get(ot['ontologyId'], None)
+                    if node:
+                        self.sample_categories[c['ontology']][node] = float(ot['pValue'])
+
+            nodes_original_ids = set()
+            for c in response['data']['modules']['biofeatureAnnotationEnrichment']:
+                for ot in c['ontologyTerm']:
+                    nodes_original_ids.add(ot['ontologyId'])
+            nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
+            for c in response['data']['modules']['biofeatureAnnotationEnrichment']:
+                self.biofeature_categories[c['ontology']] = {}
+                for ot in c['ontologyTerm']:
+                    node = nodes_map.get(ot['ontologyId'], None)
+                    if node:
+                        self.biofeature_categories[c['ontology']][node] = float(ot['pValue'])
+
+        def __str__(self):
+            f = '{bf_ss}: {cat_name}, {d_name} ({d_id}), p_value {p_value}'
+            s = []
+            for c, d in self.biofeature_categories.items():
+                for ont, p_value in d.items():
+                    s.append(f.format(bf_ss='BioFeature', cat_name=c, d_name=ont.termShortName, d_id=ont.originalId, p_value=str(p_value)))
+            for c, d in self.sample_categories.items():
+                for ont, p_value in d.items():
+                    s.append(f.format(bf_ss='SampleSet', cat_name=c, d_name=ont.termShortName, d_id=ont.originalId, p_value=str(p_value)))
+            return '\n'.join(s)
+
+        def __repr__(self):
+            return self.__str__()
+
+
     def __init__(self, *args, **kwargs):
         self.biological_features = tuple()
         self.sample_sets = tuple()
         self.name = None
         self.id = None
         self.__normalized_values__ = None
+        self.__module_description__ = None
+        self.__enrichment__ = None
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -138,6 +236,8 @@ class Module:
             ))
         # now we biofeatures and samplesets
         setattr(self, '__normalized_values__', None)
+        setattr(self, '__module_description__', None)
+        setattr(self, '__enrichment__', None)
         self.values
 
         return self
@@ -191,6 +291,87 @@ class Module:
             )}
             self.biological_features = [self.biological_features[i] for i in _bf]
         return self.__normalized_values__
+
+    def get_description(self):
+        '''
+        Get module brief sample description using ontology annotation terms
+
+        :return: ModuleDescription
+        '''
+        def _get_samples_short_description(filter=None, fields=None):
+            query = '''\
+                {{\
+                    {base}(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}" {filter}) {{\
+                        {fields}\
+                    }}\
+                }}\
+            '''.format(base='modules', compendium=self.compendium.compendium_name,
+                       version=self.compendium.version,
+                       database=self.compendium.database,
+                       normalization=self.compendium.normalization,
+                       filter=', biofeaturesIds:[' + ','.join(
+                           ['"' + bf.id + '"' for bf in self.biological_features]) + '],' +
+                              'samplesetIds: [' + ','.join(['"' + ss.id + '"' for ss in self.sample_sets]) + ']',
+                       fields=fields)
+            return run_query(self.compendium.connection.url, query)
+
+        if self.__module_description__ is None:
+            response = _get_samples_short_description(fields='''samplesDescriptionSummary {
+                        category
+                        details {
+                            originalId
+                            termShortName
+                            samples {
+                                id
+                            }
+                        }          
+                }''')
+            self.__module_description__ = Module.ModuleDescription(self, response)
+        return self.__module_description__
+
+    def get_enrichment(self, bf_p_value=0.05, ss_p_value=0.05):
+        '''
+        Get module ontology annotation terms enrichment
+
+        :return: ModuleEnrichment
+        '''
+
+        def _get_enrichment(filter=None, fields=None):
+            query = '''\
+                {{\
+                    {base}(compendium:"{compendium}", version:"{version}", database:"{database}", normalization:"{normalization}" {filter}) {{\
+                        {fields}\
+                    }}\
+                }}\
+            '''.format(base='modules', compendium=self.compendium.compendium_name,
+                       version=self.compendium.version,
+                       database=self.compendium.database,
+                       normalization=self.compendium.normalization,
+                       filter=', biofeaturesIds:[' + ','.join(
+                           ['"' + bf.id + '"' for bf in self.biological_features]) + '],' +
+                              'samplesetIds: [' + ','.join(['"' + ss.id + '"' for ss in self.sample_sets]) + ']',
+                       fields=fields)
+            return run_query(self.compendium.connection.url, query)
+
+        if self.__enrichment__ is None:
+            response = _get_enrichment(fields='''samplesetAnnotationEnrichment(corrPValueCutoff: {ss_p_value}) {{\
+                  ontology,\
+                  ontologyTerm {{\
+                    ontologyId\
+                    description\
+                    pValue\
+                  }}\
+                }}\
+                biofeatureAnnotationEnrichment(corrPValueCutoff: {bf_p_value}) {{\
+                  ontology\
+                  ontologyTerm {{\
+                    ontologyId\
+                    description\
+                    pValue\
+                  }}\
+                }}'''.format(ss_p_value=ss_p_value, bf_p_value=bf_p_value))
+            self.__enrichment__ = Module.ModuleEnrichment(self, response)
+        return self.__enrichment__
 
     def add_biological_features(self, biological_features=[]):
         '''

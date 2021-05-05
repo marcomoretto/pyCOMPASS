@@ -28,6 +28,12 @@ class OntologyNode:
             pass
         return [OntologyNode(**dict({'compendium': self.compendium}, **o)) for o in _get_ontology_node(self.compendium, filter=filter, fields=fields)]
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
 
     @staticmethod
     def using(compendium):

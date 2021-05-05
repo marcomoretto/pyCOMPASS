@@ -12,6 +12,7 @@ class SampleSet:
     def __init__(self, s=(), *args, **kwargs):
         self.__samples__ = tuple(s)
         self.__current__ = 0
+        self.__short_annotation_description__ = None
         self.__len__ = len(self.__samples__)
         for k, v in kwargs.items():
             if k == 'normalizationdesignsampleSet':
@@ -73,6 +74,19 @@ class SampleSet:
 
     def __eq__(self, other):
         return self.id == other.id
+
+    @property
+    def short_annotation_description(self):
+        @query_getter('sampleSets', ['id',
+                                     'shortAnnotationDescription'])
+        def _get_sample_sets(obj, filter=None, fields=None):
+            pass
+
+        if not self.__short_annotation_description__:
+            ss = _get_sample_sets(self.compendium, filter={'id': self.id})
+            if len(ss):
+                self.__short_annotation_description__ = ss[0]['shortAnnotationDescription']
+        return self.__short_annotation_description__
 
     @staticmethod
     def using(compendium):
