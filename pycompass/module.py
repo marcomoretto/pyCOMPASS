@@ -74,25 +74,27 @@ class Module:
             for c in response['data']['modules']['samplesetAnnotationEnrichment']:
                 for ot in c['ontologyTerm']:
                     nodes_original_ids.add(ot['ontologyId'])
-            nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
-            for c in response['data']['modules']['samplesetAnnotationEnrichment']:
-                self.sample_categories[c['ontology']] = {}
-                for ot in c['ontologyTerm']:
-                    node = nodes_map.get(ot['ontologyId'], None)
-                    if node:
-                        self.sample_categories[c['ontology']][node] = float(ot['pValue'])
+            if nodes_original_ids:
+                nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
+                for c in response['data']['modules']['samplesetAnnotationEnrichment']:
+                    self.sample_categories[c['ontology']] = {}
+                    for ot in c['ontologyTerm']:
+                        node = nodes_map.get(ot['ontologyId'], None)
+                        if node:
+                            self.sample_categories[c['ontology']][node] = float(ot['pValue'])
 
             nodes_original_ids = set()
             for c in response['data']['modules']['biofeatureAnnotationEnrichment']:
                 for ot in c['ontologyTerm']:
                     nodes_original_ids.add(ot['ontologyId'])
-            nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
-            for c in response['data']['modules']['biofeatureAnnotationEnrichment']:
-                self.biofeature_categories[c['ontology']] = {}
-                for ot in c['ontologyTerm']:
-                    node = nodes_map.get(ot['ontologyId'], None)
-                    if node:
-                        self.biofeature_categories[c['ontology']][node] = float(ot['pValue'])
+            if nodes_original_ids:
+                nodes_map = {o.originalId: o for o in OntologyNode.using(self.module.compendium).get(filter={'originalId_In': list(nodes_original_ids)})}
+                for c in response['data']['modules']['biofeatureAnnotationEnrichment']:
+                    self.biofeature_categories[c['ontology']] = {}
+                    for ot in c['ontologyTerm']:
+                        node = nodes_map.get(ot['ontologyId'], None)
+                        if node:
+                            self.biofeature_categories[c['ontology']][node] = float(ot['pValue'])
 
         def __str__(self):
             f = '{bf_ss}: {cat_name}, {d_name} ({d_id}), p_value {p_value}'
