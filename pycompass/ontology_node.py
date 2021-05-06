@@ -1,3 +1,4 @@
+from pycompass.ontology import Ontology
 from pycompass.query import query_getter
 from pycompass.utils import get_compendium_object
 import json
@@ -10,7 +11,14 @@ class OntologyNode:
 
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if k == 'ontology':
+                self.__ontology_id__ = v['id']
+            else:
+                setattr(self, k, v)
+
+    @property
+    def ontology(self):
+        return Ontology.using(self.compendium).get(filter={'id': self.__ontology_id__})[0]
 
     def by(self, *args, **kwargs):
         raise NotImplementedError()
@@ -23,7 +31,7 @@ class OntologyNode:
         :param fields: return only specific fields
         :return: list of OntologyNode objects
         '''
-        @query_getter('ontologyNode', ['id', 'originalId', 'termShortName', 'json'])
+        @query_getter('ontologyNode', ['id', 'originalId', 'termShortName', 'json', 'ontology { id }'])
         def _get_ontology_node(obj, filter=None, fields=None):
             pass
         return [OntologyNode(**dict({'compendium': self.compendium}, **o)) for o in _get_ontology_node(self.compendium, filter=filter, fields=fields)]
