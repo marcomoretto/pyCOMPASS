@@ -103,7 +103,8 @@ class Sample:
             ids = set()
             for triple in json['data']['sparql']['rdfTriples']:
                 ids.update(triple)
-            ids.remove(None)
+            if ids and None in ids:
+                ids.remove(None)
             filter = {'id_In': list(ids)}
             return self.get(filter=filter)
         else:
