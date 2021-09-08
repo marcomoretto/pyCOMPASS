@@ -11,5 +11,6 @@ from pycompass.sample import Sample
 from pycompass.sample_set import SampleSet
 from pycompass.annotation import Annotation
 from pycompass.sparql import Sparql
+from pycompass.raw_data import RawData
 
-__version__ = "0.8.3"
+__version__ = "0.8.4"

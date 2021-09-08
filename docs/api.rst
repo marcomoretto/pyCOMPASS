@@ -108,3 +108,13 @@ SampleSet Class
 
 .. autoclass:: SampleSet
    :members:
+
+
+RawData Class
+-----------------------
+
+.. automodule:: pycompass.raw_data
+    :members:
+
+.. autoclass:: RawData
+   :members:
