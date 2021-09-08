@@ -37,14 +37,34 @@ class RawData:
         self.__biofeature_ids__ = [e['node']['id'] for e in raw_data['biofeatures']['edges']]
 
     def get_values(self):
+        '''
+        Get raw data values
+
+        :return: a numpy array of float
+        '''
         return self.__values__
 
     def get_value_types(self):
+        '''
+        Get the raw data value type
+
+        :return: a numpy array of string
+        '''
         return self.__value_types__
 
     def get_biofeatures(self):
+        '''
+        Get the raw data BiologicalFeature objects
+
+        :return: a list of BiologicalFeature objects
+        '''
         bfs = {bf.id: bf for bf in BiologicalFeature.using(self.sample.compendium).get(filter={'id_In': list(set(self.__biofeature_ids__))})}
         return [bfs[id] for id in self.__biofeature_ids__]
 
     def get_biofeature_reporters(self):
+        '''
+        Get the reporter names (i.e. probes for microarray or gene locustag for RNA-seq)
+
+        :return: a numpy array of string
+        '''
         return self.__biofeature_reporters__
