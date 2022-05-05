@@ -1,5 +1,5 @@
 # pyCOMPASS>_
-pyCOMPASS is a Python interface to COMPASS, the gene expression compendia GraphQL endpoint
+pyCOMPASS v2 is a Python interface to COMPASS, the gene expression compendia GraphQL endpoint
 
 
 
