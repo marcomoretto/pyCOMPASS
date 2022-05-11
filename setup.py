@@ -21,6 +21,9 @@ setuptools.setup(
     ],
     install_requires=[
         'requests',
-        'numpy'
+        'numpy',
+        'pandas',
+        'matplotlib',
+        'ipywidgets'
     ],
 )
