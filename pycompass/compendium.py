@@ -23,7 +23,9 @@ class Compendium(object):
         'experiments': 'ExperimentType',
         'dataSources': 'DataSourceType',
         'biofeatures': 'BioFeatureType',
-        'sampleSets': 'SampleSetType'
+        'sampleSets': 'SampleSetType',
+        'scoreRankMethods': 'RankMethodType',
+        'ranking': 'RankingType'
     }
 
     def __init__(self, url=DEFAULT_GRAPHQL_ENDPOINT, name=DEFAULT_COMPENDIUM, version=None, database=None, normalization=None):
@@ -34,24 +36,58 @@ class Compendium(object):
         self.normalization = normalization
         self.__modules_n__ = 0
 
+        is_valid = False
+        for compendium in self.available_compendium:
+            is_valid = is_valid or name == compendium.name
+            if not version:
+                version = compendium.defaultVersion
+            try:
+                version = list(filter(lambda x: x['versionNumber'] == version or x['versionAlias'] == version, compendium.versions))[0]
+                self.version = version['versionAlias']
+            except Exception as e:
+                raise Exception('Invalid version')
+            if not database:
+                database = version['defaultDatabase']
+            try:
+                database = list(filter(lambda x: x['name'] == database, version['databases']))[0]
+                self.database = database['name']
+            except Exception as e:
+                raise Exception('Invalid database')
+            all_normalizations = []
+            for norm in database['normalizations']:
+                _norm = norm.replace('(default)', '').strip()
+                all_normalizations.append(_norm)
+                is_default = '(default)' in norm
+                if not normalization and is_default:
+                    normalization = _norm
+                self.normalization = normalization
+            if normalization not in all_normalizations:
+                raise Exception('Invalid normalization')
+
+        if not is_valid:
+            raise Exception('Invalid compendium name')
+
     @property
     def available_compendium(self):
         query = '''
         {
-          compendia {
+          compendia{
             name,
             fullName,
-            description
+            description,
+            defaultVersion,
             versions {
               versionNumber,
               versionAlias,
+              defaultDatabase,
               databases {
                 name,
                 normalizations
               }
             }
           }
-        }'''
+        }
+        '''
         qs = QuerySet(self, None)
         qs._object_type = 'compendia'
         json = qs.__run_query__(query)

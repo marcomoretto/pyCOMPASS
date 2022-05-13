@@ -1,5 +1,3 @@
-import pandas as pd
-
 '''
 A Module class is an interface for creation of modules starting from bio_features and sample_sets. Names can be genes and conditions (conditions can be sample_sets or samples in case of sample_sets with 
 only one sample).
@@ -38,13 +36,13 @@ Module enrichment:
  
 '''
 import pandas as pd
-from ipywidgets import interact, interactive, fixed, interact_manual, Layout
+from ipywidgets import interact
 import ipywidgets as widgets
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.pyplot import gcf
 import matplotlib
 import seaborn as sns
+import networkx as nx
+import matplotlib.pyplot as plt
 
 
 def plot(*plotting_classes):
@@ -53,7 +51,7 @@ def plot(*plotting_classes):
             module = module_class(*args, **kwargs)
             for plot_class in plotting_classes:
                 setattr(
-                    module_class,
+                    module,
                     str(plot_class.__name__).lower(),
                     plot_class(module)
                 )
@@ -70,6 +68,70 @@ class Plot:
 
     def plot(self):
         raise NotImplementedError()
+
+
+class Network(Plot):
+
+    def __init__(self, module):
+        super().__init__(module)
+        self.nx_graph = nx.Graph()
+
+    def plot(self, interactive=False, corr=0.7, *args, **kwargs):
+        if interactive:
+            return self.__interactive__(corr=corr, *args, **kwargs)
+        plot_f = self.__plot__(*args, **kwargs)
+        return plot_f(corr=corr)
+
+    def __plot__(self, *args, **kwargs):
+        def _plot(corr=0.7):
+            self.nx_graph = nx.Graph()
+
+            _corr = self.module.df.T.corr()
+            _idx = _corr.index.get_level_values(self.module.df.index.names[-1])
+            for i, i_name in enumerate(_idx):
+                for j, j_name in enumerate(_idx[i + 1:]):
+                    self.nx_graph.add_edge(i_name, j_name, weight=_corr.iloc[i, i + 1 + j])
+            for i, attr in enumerate(self.module.df.index.names):
+                _attr = {}
+                for node in self.module.df.index:
+                    _attr.update({node[-1]: node[i]})
+                nx.set_node_attributes(self.nx_graph, _attr, name=attr)
+
+            fig, ax = plt.subplots(figsize=(15, 10))
+
+            label = kwargs.get('label', self.module.df.index.names[-1])
+            labels = nx.get_node_attributes(self.nx_graph, label)
+
+            layout = kwargs.get('layout', 'circular')
+            layout_fun = getattr(nx, layout + '_layout')
+            pos = layout_fun(self.nx_graph)
+            widths = nx.get_edge_attributes(self.nx_graph, 'weight')
+            nx.draw_networkx(self.nx_graph, pos, width=[0 for _ in widths.values()], ax=ax, with_labels=True, labels=labels)
+            return nx.draw_networkx_edges(self.nx_graph, pos, ax=ax,
+                                          width=[2 if np.abs(c) >= corr else 0 for c in widths.values()],
+                                          edge_color=['black' if c >= 0 else 'red' for c in widths.values()])
+
+        return _plot
+
+    def __interactive__(self, *args, **kwargs):
+        plot_f = self.__plot__(*args, **kwargs)
+        x = widgets.FloatSlider(
+            value=kwargs.get('corr', 0.7),
+            min=0,
+            max=1,
+            step=0.1,
+            description='PCC',
+            disabled=False,
+            continuous_update=False,
+            orientation='horizontal',
+            readout=True,
+            readout_format='.1f',
+            # layout=Layout(width='500px')
+        )
+
+        interact(plot_f,
+                 corr=x
+                 )
 
 
 class Heatmap(Plot):
@@ -240,16 +302,20 @@ class Heatmap(Plot):
             # lines
             for row_line in row_lines:
                 cls = [str(i) for i in self.module.df.index.get_level_values(row_line)]
-                for unique_cls in list(dict.fromkeys(cls)):
-                    last_occurence = ''.join(cls).rindex(unique_cls) + 1
-                    if last_occurence < len(cls):
-                        g.ax_heatmap.axhline(y=last_occurence, linewidth=2, color="w")
+                prev_pos = 0
+                prev_value = cls[prev_pos]
+                for i, x in enumerate(cls):
+                    if x != prev_value:
+                        g.ax_heatmap.axhline(y=i, linewidth=2, color="w")
+                    prev_value = x
             for col_line in col_lines:
                 cls = [str(i) for i in self.module.df.columns.get_level_values(col_line)]
-                for unique_cls in list(dict.fromkeys(cls)):
-                    last_occurence = ''.join(cls).rindex(unique_cls) + 1
-                    if last_occurence < len(cls):
-                        g.ax_heatmap.axvline(x=last_occurence, linewidth=2, color="w")
+                prev_pos = 0
+                prev_value = cls[prev_pos]
+                for i, x in enumerate(cls):
+                    if x != prev_value:
+                        g.ax_heatmap.axvline(x=i, linewidth=2, color="w")
+                    prev_value = x
 
             # title
             if title is None:
@@ -316,13 +382,103 @@ class Heatmap(Plot):
                  )
 
 
-@plot(Heatmap)
+@plot(Heatmap, Network)
 class Module:
 
     def __init__(self, *args, **kwargs):
         self._compendium = kwargs.get('compendium', None)
         self.df = kwargs.get('df', None)
         self.name = kwargs.get('name', 'Module')
+
+    def extends(self, target='biofeatures', first=50, score=0.9, *args, **kwargs):
+        connections = []
+        if self._compendium.version:
+            connections.append('version:"{}"'.format(self._compendium.version))
+        if self._compendium.database:
+            connections.append('database:"{}"'.format(self._compendium.database))
+        if self._compendium.normalization:
+            connections.append('normalization:"{}"'.format(self._compendium.normalization))
+        qs = self._compendium.query('scoreRankMethods')
+        id_type = 'samplesetIds'
+        if target == 'biofeatures':
+            query = '''
+            {{
+              scoreRankMethods(compendium:"{compendium}", {connections}) {{
+                    biologicalFeatures
+              }}
+            }}
+            '''.format(
+                compendium=self._compendium.name,
+                connections=', ' + ','.join(connections)
+            )
+            json = qs.__run_query__(query)
+            methods = json['data']['scoreRankMethods']['biologicalFeatures']
+            method = kwargs.get('method', methods[0])
+            if method not in methods:
+                raise Exception('Invalid method argument. Allowed values are ' + ' '.join(methods))
+            ids = ','.join('"{}"'.format(x) for x in self.df.columns.get_level_values('samplesets'))
+        else:
+            query = '''
+            {{
+              scoreRankMethods(compendium:"{compendium}", {connections}) {{
+                    sampleSets
+              }}
+            }}
+            '''.format(
+                compendium=self._compendium.name,
+                connections=', ' + ','.join(connections)
+            )
+            json = qs.__run_query__(query)
+            methods = json['data']['scoreRankMethods']['sampleSets']
+            method = kwargs.get('method', methods[0])
+            if method not in methods:
+                raise Exception('Invalid method argument. Allowed values are ' + ' '.join(methods))
+            id_type = 'biofeaturesIds'
+            ids = ','.join('"{}"'.format(x) for x in self.df.index.get_level_values('biofeatures'))
+
+        qs = self._compendium.query('ranking')
+        query = '''
+        {{
+            ranking(compendium: "{compendium}", rankTarget: "{target}", rank: "{method}",
+                {id_type}: [{ids}], {connections}) {{
+                id,
+                name,
+                type,
+                value
+            }}
+        }}'''.format(
+                compendium=self._compendium.name,
+                connections=', ' + ','.join(connections),
+                target=target,
+                method=method,
+                id_type=id_type,
+                ids=ids
+        )
+        json = qs.__run_query__(query)
+        data = json['data']['ranking']
+        _values = np.array(data['value'])
+        limit = min(first, len(_values[_values >= score]))
+        _data = set()
+        bf_idx = self.df.index.get_level_values('biofeatures').tolist()
+        ss_idx = self.df.columns.get_level_values('samplesets').tolist()
+        for _d in data['id']:
+            if len(_data) == limit:
+                break
+            if target == 'biofeatures':
+                if _d not in bf_idx:
+                    _data.add(_d)
+            elif target == 'samplesets':
+                if _d not in ss_idx:
+                    _data.add(_d)
+        if target == 'biofeatures':
+            bf_idx += list(_data)
+        elif target == 'samplesets':
+            ss_idx += list(_data)
+        return self._compendium.module(
+            name='Extended {target} {name}'.format(target=target, name=self.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
 
     def __iter__(self):
         for k, v in self.df.to_dict().items():
@@ -336,10 +492,139 @@ class Module:
         if self.df is not None:
             return self.df.head(5).__repr__()
 
+    def __sub__(self, other):
+        '''
+        a - b subtract genes and conditions of a module and b module
+        '''
+        bf_idx = list(set(self.df.index.get_level_values('biofeatures')) - set(other.df.index.get_level_values('biofeatures')))
+        ss_idx = list(set(self.df.columns.get_level_values('samplesets')) - set(other.df.columns.get_level_values('samplesets')))
+        if not len(bf_idx):
+            raise Exception('Resulting biofeatures list is empty!')
+        if not len(ss_idx):
+            raise Exception('Resulting samplesets list is empty!')
+        new_module = self._compendium.module(
+            name='{module_1} - {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+        return new_module
+
+    def __lshift__(self, other):
+        '''
+        a << b remove only genes from b to a
+        '''
+        bf_idx = list(
+            set(self.df.index.get_level_values('biofeatures')) - set(other.df.index.get_level_values('biofeatures')))
+        ss_idx = list(set(self.df.columns.get_level_values('samplesets')))
+        if not len(bf_idx):
+            raise Exception('Resulting biofeatures list is empty!')
+        new_module = self._compendium.module(
+            name='{module_1} << {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+        return new_module
+
+    def __xor__(self, other):
+        '''
+        a ^ b remove only conditions of b from a
+        '''
+        bf_idx = list(set(self.df.index.get_level_values('biofeatures')))
+        ss_idx = list(
+            set(self.df.columns.get_level_values('samplesets')) - set(other.df.columns.get_level_values('samplesets')))
+        if not len(ss_idx):
+            raise Exception('Resulting samplesets list is empty!')
+        new_module = self._compendium.module(
+            name='{module_1} ^ {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+
+        return new_module
+
+    def __or__(self, other):
+        '''
+        a | b add only conditions of a to b
+        '''
+        self_label = 'module_left'
+        other_label = 'module_right'
+        bf_idx = list(set(self.df.index.get_level_values('biofeatures')))
+        ss_idx = list(set(self.df.columns.get_level_values('samplesets')).union(
+            set(other.df.columns.get_level_values('samplesets'))))
+        new_module = self._compendium.module(
+            name='{module_1} | {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+        # add new multiindex biofeatures
+        return self.__modify_multiindex__(other, new_module, self_label, other_label)
+
     def __add__(self, other):
-        pass
+        '''
+        a + b sum genes and conditions of a module and b module
+        '''
+        self_label = 'module_left'
+        other_label = 'module_right'
+        bf_idx = list(set(self.df.index.get_level_values('biofeatures')).union(
+            set(other.df.index.get_level_values('biofeatures'))))
+        ss_idx = list(set(self.df.columns.get_level_values('samplesets')).union(
+            set(other.df.columns.get_level_values('samplesets'))))
+        new_module = self._compendium.module(
+            name='{module_1} + {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+        # add new multiindex biofeatures
+        return self.__modify_multiindex__(other, new_module, self_label, other_label)
 
     def __rshift__(self, other):
-        bf = list(set(self.df.index).union(set(other._df.index)))
-        ss = list(self.df.columns)
-        return self._compendium.module(biofeatures=bf, samplesets=ss)
+        '''
+        a >> b add only genes of a to b
+        '''
+        self_label = 'module_left'
+        other_label = 'module_right'
+        bf_idx = list(set(self.df.index.get_level_values('biofeatures')).union(
+            set(other.df.index.get_level_values('biofeatures'))))
+        ss_idx = list(set(self.df.columns.get_level_values('samplesets')))
+        new_module = self._compendium.module(
+            name='{module_1} >> {module_2}'.format(module_1=self.name, module_2=other.name),
+            biofeatures=bf_idx,
+            samplesets=ss_idx
+        )
+        # add new multiindex biofeatures
+        return self.__modify_multiindex__(other, new_module, self_label, other_label)
+
+    def __modify_multiindex__(self, other, new_module, self_label, other_label):
+        first_bf_list = self.df.index.get_level_values('biofeatures').tolist()
+        second_bf_list = other.df.index.get_level_values('biofeatures').tolist()
+        first_name = self.name
+        second_name = other.name
+        new_multiindex = []
+        for i in new_module.df.index.tolist():
+            _new_multiindex = [None, None]
+            if i[-1] in first_bf_list:
+                _new_multiindex[0] = first_name
+            if i[-1] in second_bf_list:
+                _new_multiindex[1] = second_name
+            new_multiindex.append(tuple(_new_multiindex + list(i)))
+        names = [self_label, other_label] + list(new_module.df.index.names)
+        new_module.df.index = pd.MultiIndex.from_tuples(
+            new_multiindex, names=names)
+        # add new multiindex samplesets
+        first_ss_list = self.df.columns.get_level_values('samplesets').tolist()
+        second_ss_list = other.df.columns.get_level_values('samplesets').tolist()
+        first_name = self.name
+        second_name = other.name
+        new_multiindex = []
+        for i in new_module.df.columns.tolist():
+            _new_multiindex = [None, None]
+            if i[-1] in first_ss_list:
+                _new_multiindex[0] = first_name
+            if i[-1] in second_ss_list:
+                _new_multiindex[1] = second_name
+            new_multiindex.append(tuple(_new_multiindex + list(i)))
+        names = [self_label, other_label] + list(new_module.df.columns.names)
+        new_module.df.columns = pd.MultiIndex.from_tuples(
+            new_multiindex, names=names)
+
+        return new_module

@@ -24,6 +24,8 @@ setuptools.setup(
         'numpy',
         'pandas',
         'matplotlib',
-        'ipywidgets'
+        'ipywidgets',
+        'seaborn',
+        'networkx'
     ],
 )
