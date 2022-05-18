@@ -382,6 +382,39 @@ class Heatmap(Plot):
                  )
 
 
+class Annotate(object):
+    def __init__(self, module):
+        self.module = module
+
+    def __call__(self, *args, **kwargs):
+        if 'biofeatures' in kwargs:
+            self.__annotate_biofeatures__(kwargs['biofeatures'])
+        if 'samplesets' in kwargs:
+            self.__annotate_samplesets__(kwargs['samplesets'])
+
+    def __annotate_biofeatures__(self, biofeatures_terms):
+        for term in biofeatures_terms:
+            if term in ['name', 'description']:
+                bf_idx = self.module.df.index.get_level_values('biofeatures').tolist()
+                bfs = [getattr(bf, term) for bf in self.module._compendium.query('biofeatures').filter(id_In=bf_idx).fields(term)]
+                self.module.df[term] = pd.Series(bfs, index=self.module.df.index)
+                self.module.df = self.module.df.reset_index().set_index([term] + list(self.module.df.index.names))
+            else:
+                pass # sparql
+
+    def __annotate_samplesets__(self, samplesets_terms):
+        for term in samplesets_terms:
+            if term in ['name', 'shortAnnotationDescription']:
+                ss_idx = self.module.df.columns.get_level_values('samplesets').tolist()
+                ss = [getattr(ss, term) for ss in self.module._compendium.query('samplesets').filter(id_In=ss_idx).fields(term)]
+                df = self.module.df.T
+                df[term] = pd.Series(ss, index=df.index)
+                df = df.reset_index().set_index([term] + list(df.index.names))
+                self.module.df = df.T
+            else:
+                pass  # sparql
+
+
 @plot(Heatmap, Network)
 class Module:
 
@@ -389,6 +422,7 @@ class Module:
         self._compendium = kwargs.get('compendium', None)
         self.df = kwargs.get('df', None)
         self.name = kwargs.get('name', 'Module')
+        self.annotate = Annotate(self)
 
     def extends(self, target='biofeatures', first=50, score=0.9, *args, **kwargs):
         connections = []
@@ -599,32 +633,30 @@ class Module:
         second_bf_list = other.df.index.get_level_values('biofeatures').tolist()
         first_name = self.name
         second_name = other.name
-        new_multiindex = []
-        for i in new_module.df.index.tolist():
-            _new_multiindex = [None, None]
-            if i[-1] in first_bf_list:
-                _new_multiindex[0] = first_name
-            if i[-1] in second_bf_list:
-                _new_multiindex[1] = second_name
-            new_multiindex.append(tuple(_new_multiindex + list(i)))
+        _first = [first_name if i[-1] in first_bf_list else None for i in new_module.df.index.tolist()]
+        _second = [second_name if i[-1] in second_bf_list else None for i in new_module.df.index.tolist()]
+        new_module.df[self_label] = pd.Series(_first, index=new_module.df.index)
+        new_module.df[other_label] = pd.Series(_second, index=new_module.df.index)
         names = [self_label, other_label] + list(new_module.df.index.names)
-        new_module.df.index = pd.MultiIndex.from_tuples(
-            new_multiindex, names=names)
-        # add new multiindex samplesets
+        new_module.df = new_module.df.reset_index().set_index(names)
+
         first_ss_list = self.df.columns.get_level_values('samplesets').tolist()
         second_ss_list = other.df.columns.get_level_values('samplesets').tolist()
         first_name = self.name
         second_name = other.name
-        new_multiindex = []
-        for i in new_module.df.columns.tolist():
-            _new_multiindex = [None, None]
-            if i[-1] in first_ss_list:
-                _new_multiindex[0] = first_name
-            if i[-1] in second_ss_list:
-                _new_multiindex[1] = second_name
-            new_multiindex.append(tuple(_new_multiindex + list(i)))
-        names = [self_label, other_label] + list(new_module.df.columns.names)
-        new_module.df.columns = pd.MultiIndex.from_tuples(
-            new_multiindex, names=names)
+        new_module.df = new_module.df.T
+        _first = [first_name if i[-1] in first_ss_list else None for i in new_module.df.index.tolist()]
+        _second = [second_name if i[-1] in second_ss_list else None for i in new_module.df.index.tolist()]
+        new_module.df[self_label] = pd.Series(_first, index=new_module.df.index)
+        new_module.df[other_label] = pd.Series(_second, index=new_module.df.index)
+        names = [self_label, other_label] + list(new_module.df.index.names)
+        new_module.df = new_module.df.reset_index().set_index(names)
+        new_module.df = new_module.df.T
+
+        # missing index and columns
+        missing_index = [x for x in self.df.index.names if x not in new_module.df.index.names]
+        missing_columns = [x for x in self.df.columns.names if x not in new_module.df.columns.names]
+
+        new_module.annotate(biofeatures=missing_index, samplesets=missing_columns)
 
         return new_module

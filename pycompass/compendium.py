@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 
 DEFAULT_GRAPHQL_ENDPOINT = "http://fempc0734:2424/graphql" #"http://compass.fmach.it/graphql"
+DEFAULT_BASE_URL = "http://fempc0734:2424/" #"http://compass.fmach.it/static"
 DEFAULT_SPARQL_ENDPOINT = "http://compass.fmach.it/sparql"
 DEFAULT_COMPENDIUM = "vespucci"
 
@@ -66,6 +67,35 @@ class Compendium(object):
 
         if not is_valid:
             raise Exception('Invalid compendium name')
+
+    @property
+    def whole_compendium(self):
+        connections = []
+        if self.version:
+            connections.append('version:"{}"'.format(self.version))
+        if self.database:
+            connections.append('database:"{}"'.format(self.database))
+        if self.normalization:
+            connections.append('normalization:"{}"'.format(self.normalization))
+        query = '''
+        {{
+            wholeCompendium(compendium:"{compendium}") {{
+                staticFilename
+            }}
+        }}
+        '''.format(
+            compendium=self.name,
+            connections=', ' + ','.join(connections)
+        )
+        qs = QuerySet(self, None)
+        qs._object_type = 'compendia'
+        json = qs.__run_query__(query)
+        file_url = DEFAULT_BASE_URL + json['data']['wholeCompendium']['staticFilename']
+        df = pd.read_csv(file_url, compression='zip')
+        df = df.set_index('Unnamed: 0')
+        df.index.names = ['biofeatures']
+        df.columns.names = ['samplesets']
+        return Module(compendium=self, df=df, name='Whole compendium')
 
     @property
     def available_compendium(self):
@@ -190,35 +220,15 @@ class Compendium(object):
         # create multiindex clusters
         bf_clusters = [[e + 1] * i for e, i in enumerate(cluster_biofeatures)][::-1]
         bf_clusters = [item for sublist in bf_clusters for item in sublist]
-        bf_new_multiindex = []
-        for bf, cluster in zip(df.index.tolist(), bf_clusters):
-            try:
-                if type(bf) == str:
-                    bf = [bf]
-                else:
-                    iter(bf)
-            except TypeError as te:
-                bf = [bf]
-            bf_new_multiindex.append(tuple(list([cluster]) + list(bf)))
-        bf_multiindex_names = ['cluster'] + list(df.index.names)
-        bf_new_multiindex = pd.MultiIndex.from_tuples(bf_new_multiindex, names=bf_multiindex_names)
-        df.index = bf_new_multiindex
+        df['cluster'] = pd.Series(bf_clusters, index=df.index)
+        df = df.reset_index().set_index(['cluster'] + list(df.index.names))
 
         ss_clusters = [[e + 1] * i for e, i in enumerate(cluster_samplesets)]
         ss_clusters = [item for sublist in ss_clusters for item in sublist]
-        ss_new_multiindex = []
-        for ss, cluster in zip(df.columns.tolist(), ss_clusters):
-            try:
-                if type(ss) == str:
-                    ss = [ss]
-                else:
-                    iter(ss)
-            except TypeError as te:
-                ss = [ss]
-            ss_new_multiindex.append(tuple(list([cluster]) + list(ss)))
-        ss_multiindex_names = ['cluster'] + list(df.columns.names)
-        ss_new_multiindex = pd.MultiIndex.from_tuples(ss_new_multiindex, names=ss_multiindex_names)
-        df.columns = ss_new_multiindex
+        df = df.T
+        df['cluster'] = pd.Series(ss_clusters, index=df.index)
+        df = df.reset_index().set_index(['cluster'] + list(df.index.names))
+        df = df.T
 
         self.__modules_n__ += 1
         _name = kwargs.get('name', 'Module_{n}'.format(n=self.__modules_n__))
