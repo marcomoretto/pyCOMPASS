@@ -19,19 +19,37 @@ class QuerySet():
                 return r
             raise StopIteration
 
-    def __init__(self, compendium, object_type):
+    def __init__(self, compendium, object_type, annotation_class=None):
         self._compendium = compendium
         self._object_type = object_type
         self._filter = {}
         self._fields = {'id'}
         self._object_fields = {}
+        self._annotation_class = annotation_class
 
     def __iter__(self):
+        # putative sparql fields
+        sparql_fields = self._fields.intersection(set(self._annotation_class.QUERIES.keys()))
+        # remove non-graphql fields
+        try:
+            self._fields = self._fields.intersection(set(self.__graphql_fields__))
+            self._fields = self._fields - set(self._annotation_class.QUERIES.keys())
+            # add name to the fields if there are also sparql fields (required by sparql)
+            if sparql_fields:
+                self._fields.add(self._annotation_class.REQUIRED_FIELD)
+        except Exception as e:
+            pass
         query = self.__create_query__()
         json = self.__run_query__(query)
         nodes = [x['node'] for x in json['data'][self._object_type]['edges']]
+
+        # add sparql fields if necessary
+        if sparql_fields and self._annotation_class:
+            self._annotation_class(sparql_fields, nodes)
+
         # create objects
         tuples = self.__create_namedtuples__(nodes)
+
         return QuerySet.QuerySetIterator(tuples)
 
     def throw(self, type=None, value=None, traceback=None):
@@ -46,6 +64,14 @@ class QuerySet():
 
     @property
     def all_fields(self):
+        if not self._object_type:
+            raise Exception('No query object')
+        if self._annotation_class:
+            return list(set(self.__graphql_fields__ + list(self._annotation_class.QUERIES.keys())))
+        return self.__graphql_fields__
+
+    @property
+    def __graphql_fields__(self):
         if not self._object_type:
             raise Exception('No query object')
         return list(set(self.__meta_type__(self._compendium.ALLOWED_OBJECTS[self._object_type])))

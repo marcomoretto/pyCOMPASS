@@ -13,18 +13,27 @@ from pycompass.graphql_query import QuerySet
 from pycompass.module import Module
 import pandas as pd
 import numpy as np
+from pycompass.sparql_query import SampleAnnotation, SampleSetAnnotation, BioFeatureAnnotation
 
 DEFAULT_GRAPHQL_ENDPOINT = "http://fempc0734:2424/graphql" #"http://compass.fmach.it/graphql"
 DEFAULT_BASE_URL = "http://fempc0734:2424/" #"http://compass.fmach.it/static"
 DEFAULT_SPARQL_ENDPOINT = "http://compass.fmach.it/sparql"
 DEFAULT_COMPENDIUM = "vespucci"
 
+
 class Compendium(object):
+    ANNOTATION_CLASSES = {
+        'biofeatures': BioFeatureAnnotation(DEFAULT_SPARQL_ENDPOINT),
+        'samples': SampleAnnotation(DEFAULT_SPARQL_ENDPOINT),
+        'sampleSets': SampleSetAnnotation(DEFAULT_SPARQL_ENDPOINT)
+    }
+
     ALLOWED_OBJECTS = {
         'experiments': 'ExperimentType',
         'dataSources': 'DataSourceType',
         'biofeatures': 'BioFeatureType',
         'sampleSets': 'SampleSetType',
+        'samples': 'SampleType',
         'scoreRankMethods': 'RankMethodType',
         'ranking': 'RankingType'
     }
@@ -126,7 +135,7 @@ class Compendium(object):
     def query(self, object_type):
         for k, v in self.ALLOWED_OBJECTS.items():
             if object_type and object_type.lower() == k.lower():
-                return QuerySet(self, k)
+                return QuerySet(self, k, self.ANNOTATION_CLASSES.get(k, None))
         raise Exception('You cannot query this object. Use the GraphQL interface.')
 
     def module(self, *args, **kwargs):
