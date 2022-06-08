@@ -1,11 +1,12 @@
 import setuptools
+import pycompass
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="pyCOMPASS",
-    version="2.0.1",
+    version=pycompass.__version__,
     author="Marco Moretto",
     author_email="marco.moretto@fmach.it",
     description="A Python interface to COMPASS, the gene expression compendia GraphQL endpoint",
