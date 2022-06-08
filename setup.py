@@ -26,6 +26,7 @@ setuptools.setup(
         'matplotlib',
         'ipywidgets',
         'seaborn',
-        'networkx'
+        'networkx',
+        'sparqlwrapper'
     ],
 )
