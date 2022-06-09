@@ -403,16 +403,18 @@ class Annotate(object):
                 pass # sparql
 
     def __annotate_samplesets__(self, samplesets_terms):
-        for term in samplesets_terms:
-            if term in ['name', 'shortAnnotationDescription']:
-                ss_idx = self.module.df.columns.get_level_values('samplesets').tolist()
-                ss = [getattr(ss, term) for ss in self.module._compendium.query('samplesets').filter(id_In=ss_idx).fields(term)]
+        ss_idx = self.module.df.columns.get_level_values('samplesets').tolist()
+        all_ss = list(self.module._compendium.query('sampleSets').filter(id_In=ss_idx).fields(*samplesets_terms))
+        if not all_ss:
+            return
+        for _term in samplesets_terms:
+            available_terms = [x for x in all_ss[0]._fields if x.startswith(_term)]
+            for term in available_terms:
+                ss = [getattr(ss, term) for ss in all_ss]
                 df = self.module.df.T
                 df[term] = pd.Series(ss, index=df.index)
                 df = df.reset_index().set_index([term] + list(df.index.names))
                 self.module.df = df.T
-            else:
-                pass  # sparql
 
 
 @plot(Heatmap, Network)

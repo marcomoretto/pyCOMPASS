@@ -22,40 +22,78 @@ class SampleAnnotation(object):
 
     REQUIRED_FIELD = 'sampleName'
 
-    PREFIX = {'geo': '<https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>'}
+    PREFIX = {
+        'geo': 'https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=',
+        'sra': 'https://www.ncbi.nlm.nih.gov/sra?term=',
+        'obo': 'http://purl.obolibrary.org/obo/',
+        'rdfs': 'http://www.w3.org/2000/01/rdf-schema#'
+    }
 
     QUERIES = {
         'experiment': '''
             PREFIX geo: {geo_prefix}
-            SELECT ?s ?o WHERE {{
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
+            
+            SELECT ?s ?o WHERE {{ {{
                 ?s <http://purl.obolibrary.org/obo/OBI_0001896> ?o .
                 FILTER (
                     {subjects}
                 )
-            }}''',
-        'cultivar': '''
-            PREFIX geo: {geo_prefix}
-            SELECT ?s ?o WHERE {{
-                ?s <http://www.ebi.ac.uk/efo/EFO_0005136> ?o .
+            }} UNION {{
+                ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+                ?s1 <http://purl.obolibrary.org/obo/OBI_0001896> ?o .
                 FILTER (
                     {subjects}
                 )
-            }}
+            }} }}''',
+        'cultivar': '''
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
+            
+            SELECT ?s ?o WHERE {{ {{
+                ?s <http://www.ebi.ac.uk/efo/EFO_0005136> ?o .
+                FILTER (
+                    {subjects}
+                ) 
+            }} UNION {{
+                ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+                ?s1 <http://www.ebi.ac.uk/efo/EFO_0005136> ?o .
+                FILTER (
+                    {subjects}
+                )
+            }} }}
         ''',
         'rootstock': '''
             PREFIX geo: {geo_prefix}
-            SELECT ?s ?o WHERE {{
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
+            
+            SELECT ?s ?o WHERE {{ {{
                 ?s <http://purl.obolibrary.org/obo/NCBITaxon_580088> ?o .
                 FILTER (
                     {subjects}
                 )
+            }} UNION {{
+                ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+                ?s1 <http://purl.obolibrary.org/obo/NCBITaxon_580088> ?o .
+                FILTER (
+                    {subjects}
+                )
+            }}
             }}
         ''',
         'general_qualifier': '''
-            PREFIX geo: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>
-            PREFIX obo: <http://purl.obolibrary.org/obo/>
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
             
-            SELECT ?s ?o WHERE {{
+            SELECT ?s ?o WHERE {{ {{
               ?s <http://purl.obolibrary.org/obo/NCIT_C27993> ?x .
               SERVICE <http://sparql.hegroup.org/sparql/> {{
                 ?x rdfs:label ?o
@@ -63,13 +101,25 @@ class SampleAnnotation(object):
               FILTER (
                 {subjects}
               )
+            }} UNION {{
+              ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+              ?s1 <http://purl.obolibrary.org/obo/NCIT_C27993> ?x .
+              SERVICE <http://sparql.hegroup.org/sparql/> {{
+                ?x rdfs:label ?o
+              }}
+              FILTER (
+                {subjects}
+              )
+            }}
             }}
         ''',
         'genotype': '''
-            PREFIX geo: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>
-            PREFIX obo: <http://purl.obolibrary.org/obo/>
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
             
-            SELECT ?s ?o WHERE {{
+            SELECT ?s ?o WHERE {{ {{
               ?s <http://purl.obolibrary.org/obo/NCIT_C16631> ?x .
               SERVICE <http://sparql.hegroup.org/sparql/> {{
                 ?x rdfs:label ?o
@@ -77,14 +127,9 @@ class SampleAnnotation(object):
               FILTER (
                 {subjects}
               )
-            }}
-        ''',
-        'plant_maturity': '''
-            PREFIX geo: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>
-            PREFIX obo: <http://purl.obolibrary.org/obo/>
-            
-            SELECT ?s ?o WHERE {{
-              ?s <http://purl.obolibrary.org/obo/FOODON_03530050> ?x .
+            }} UNION {{
+              ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+              ?s1 <http://purl.obolibrary.org/obo/NCIT_C16631> ?x .
               SERVICE <http://sparql.hegroup.org/sparql/> {{
                 ?x rdfs:label ?o
               }}
@@ -92,25 +137,63 @@ class SampleAnnotation(object):
                 {subjects}
               )
             }}
+            }}
+        ''',
+        'plant_maturity': '''
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
+            
+            SELECT ?s ?o WHERE {{ {{
+              ?s <http://purl.obolibrary.org/obo/FOODON_03530050> ?x .
+              SERVICE <http://sparql.hegroup.org/sparql/> {{
+                ?x rdfs:label ?o
+              }}
+              FILTER (
+                {subjects}
+              )
+            }} UNION {{
+              ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+              ?s1 <http://purl.obolibrary.org/obo/FOODON_03530050> ?x .
+              SERVICE <http://sparql.hegroup.org/sparql/> {{
+                ?x rdfs:label ?o
+              }}
+              FILTER (
+                {subjects}
+              )
+            }}
+            }}
         ''',
         'dev_stage': '''
-            PREFIX geo: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>
-            PREFIX obo: <http://purl.obolibrary.org/obo/>
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
             
-            SELECT ?s ?o WHERE {{
+            SELECT ?s ?o WHERE {{ {{
               ?s <http://purl.obolibrary.org/obo/PO_0007033> ?bn1 .
               ?bn1 <https://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?o .
               FILTER (
                 {subjects}
               )
+            }} UNION {{
+              ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+              ?s1 <http://purl.obolibrary.org/obo/PO_0007033> ?bn1 .
+              ?bn1 <https://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?o .
+              FILTER (
+                {subjects}
+              )
+            }}
             }}
         ''',
         'tissue': '''
-            PREFIX geo: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=>
-            PREFIX obo: <http://purl.obolibrary.org/obo/>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
             
-            SELECT distinct ?s ?o WHERE {{
+            SELECT distinct ?s ?o WHERE {{ {{
                 ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?x .
                 SERVICE <http://sparql.hegroup.org/sparql/> {{
                     ?x rdfs:label ?o
@@ -119,6 +202,17 @@ class SampleAnnotation(object):
                     {subjects}
                 )
                 FILTER(STRSTARTS(STR(?x), "http://purl.obolibrary.org/obo/PO_"))
+            }} UNION {{
+                ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+                ?s1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?x .
+                SERVICE <http://sparql.hegroup.org/sparql/> {{
+                    ?x rdfs:label ?o
+                }}
+                FILTER (
+                    {subjects}
+                )
+                FILTER(STRSTARTS(STR(?x), "http://purl.obolibrary.org/obo/PO_"))
+            }}
             }}
         '''
     }
@@ -135,15 +229,24 @@ class SampleAnnotation(object):
 
     def __call__(self, sparql_fields, nodes, *args, **kwargs):
         nodes_mapping = {
-            self.PREFIX['geo'][1:-1] + n[self.REQUIRED_FIELD].replace('.ch1', '').replace('.ch2', ''): n for n in nodes
+            self.PREFIX['geo'] + n[self.REQUIRED_FIELD].replace('.ch1', '').replace('.ch2', ''): n for n in nodes
         }
+        nodes_mapping.update({
+            self.PREFIX['sra'] + n[self.REQUIRED_FIELD]: n for n in nodes
+        })
         for field in sparql_fields:
             if field not in self.QUERIES.keys():
                 continue
             for n in nodes:
                 n[field] = None
             subjects = ' || '.join('?s=<' + n + '>' for n in nodes_mapping.keys())
-            query = self.QUERIES[field].format(subjects=subjects, geo_prefix=self.PREFIX['geo'])
+            query = self.QUERIES[field].format(
+                subjects=subjects,
+                obo_prefix='<' + self.PREFIX['obo'] + '>',
+                geo_prefix='<' + self.PREFIX['geo'] + '>',
+                sra_prefix='<' + self.PREFIX['sra'] + '>',
+                rdfs_prefix='<' + self.PREFIX['rdfs'] + '>'
+            )
             triples = self.__run_query__(query)
             for triple in triples:
                 _id = triple['s']['value']
@@ -158,7 +261,14 @@ class SampleSetAnnotation(object):
     REQUIRED_FIELD = 'design'
 
     QUERIES = {
-        "tissue": None
+        "tissue": None,
+        "plant_maturity": None,
+        "dev_stage": None,
+        "genotype": None,
+        "experiment": None,
+        "cultivar": None,
+        "rootstock": None,
+        "general_qualifier": None
     }
 
     def __init__(self, sparql_endpoint):
@@ -167,12 +277,49 @@ class SampleSetAnnotation(object):
     def __run_query__(self, query):
         pass
 
+    def __limma_normalization__(self, design, sparql_fields, compendium):
+        ref = design['elements']['edges'][0]['data']['source']
+        ref_samples = [x['data']['name'] for x in
+                       filter(lambda x: x['data'].get('parent', None) == ref, design['elements']['nodes'])]
+        ref_sample_nodes = [{SampleAnnotation.REQUIRED_FIELD: sample} for sample in ref_samples]
+
+        test = design['elements']['edges'][0]['data']['target']
+        test_samples = [x['data']['name'] for x in
+                       filter(lambda x: x['data'].get('parent', None) == test, design['elements']['nodes'])]
+        test_sample_nodes = [{SampleAnnotation.REQUIRED_FIELD: sample} for sample in test_samples]
+
+        annotation = SampleAnnotation(self.sparql_endpoint)
+        annotation(sparql_fields, ref_sample_nodes)
+        annotation(sparql_fields, test_sample_nodes)
+
+        ref_annotation = {field: sample.get(field, None) for sample in ref_sample_nodes for field in sparql_fields}
+        test_annotation = {field: sample.get(field, None) for sample in test_sample_nodes for field in sparql_fields}
+        contrast_annotation = {}
+
+        for field in sparql_fields:
+            contrast_annotation[field + '_test'] = test_annotation[field]
+            contrast_annotation[field + '_ref'] = ref_annotation[field]
+        return contrast_annotation
+
+    def __tpm_normalization__(self, design, sparql_fields, compendium):
+        samples = set([x['data']['name'] for x in filter(lambda x: x['data']['type'] == 'sample', design['elements']['nodes'])])
+        sample_nodes = [{SampleAnnotation.REQUIRED_FIELD: sample} for sample in samples]
+
+        annotation = SampleAnnotation(self.sparql_endpoint)
+        annotation(sparql_fields, sample_nodes)
+
+        return sample_nodes[0]
+
     def __call__(self, sparql_fields, nodes, *args, **kwargs):
+        compendium = kwargs.get('compendium', None)
+
         for node in nodes:
             design = json.loads(node['design'])
-            if design['elements']['edges']: # contrast
-                pass
-            else: # only condition
-                # get all samples
-                # check if the field is the same in all samples
-                pass
+            if compendium.normalization == 'limma':
+                annotation = self.__limma_normalization__(design, sparql_fields, compendium)
+                del node['design']
+                node.update(annotation)
+            elif compendium.normalization == 'tpm':
+                del node['design']
+                annotation = self.__tpm_normalization__(design, sparql_fields, compendium)
+                node.update(annotation)

@@ -45,7 +45,7 @@ class QuerySet():
 
         # add sparql fields if necessary
         if sparql_fields and self._annotation_class:
-            self._annotation_class(sparql_fields, nodes)
+            self._annotation_class(sparql_fields, nodes, compendium=self._compendium)
 
         # create objects
         tuples = self.__create_namedtuples__(nodes)
