@@ -29,6 +29,37 @@ class SampleAnnotation(object):
         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#'
     }
 
+    QUERIES_FILTER = {
+        'tissue': '''
+            PREFIX geo: {geo_prefix}
+            PREFIX obo: {obo_prefix}
+            PREFIX sra: {sra_prefix}
+            PREFIX rdfs: {rdfs_prefix}
+            
+            SELECT distinct ?s ?o WHERE {{ {{
+                ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?x .
+                SERVICE <http://sparql.hegroup.org/sparql/> {{
+                    ?x rdfs:label ?o
+                    FILTER (
+                       {objects}
+                    )
+                }}
+                FILTER(STRSTARTS(STR(?x), "http://purl.obolibrary.org/obo/PO_"))
+            }} UNION {{
+                ?s1 <http://www.w3.org/2000/01/rdf-schema#seeAlso> ?s .
+                ?s1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?x .
+                SERVICE <http://sparql.hegroup.org/sparql/> {{
+                    ?x rdfs:label ?o
+                    FILTER (
+                       {objects}
+                    )
+                }}
+                FILTER(STRSTARTS(STR(?x), "http://purl.obolibrary.org/obo/PO_"))
+            }}
+        }}
+        '''
+    }
+
     QUERIES = {
         'experiment': '''
             PREFIX geo: {geo_prefix}
@@ -274,8 +305,31 @@ class SampleSetAnnotation(object):
     def __init__(self, sparql_endpoint):
         self.sparql_endpoint = sparql_endpoint
 
+    def filter(self, key, values, *args, **kwargs):
+        graphql_query = kwargs['graphql_query']
+        query = SampleAnnotation.QUERIES_FILTER[key]
+        objects = ' || '.join('?o="' + v + '"' for v in values)
+        query = query.format(
+            objects=objects,
+            obo_prefix='<' + SampleAnnotation.PREFIX['obo'] + '>',
+            geo_prefix='<' + SampleAnnotation.PREFIX['geo'] + '>',
+            sra_prefix='<' + SampleAnnotation.PREFIX['sra'] + '>',
+            rdfs_prefix='<' + SampleAnnotation.PREFIX['rdfs'] + '>'
+        )
+        triples = self.__run_query__(query)
+        sample_acc_ids = set()
+        for triple in triples:
+            sample_acc_ids.add(triple['s']['value'].replace(SampleAnnotation.PREFIX['geo'], '').replace(SampleAnnotation.PREFIX['sra'], ''))
+        samples = graphql_query._compendium.query('samples').filter(sampleName_In=list(sample_acc_ids))
+        sample_sets = graphql_query._compendium.query('sampleSets').filter(samples=[str(s.id) for s in samples])
+        return [ss.id for ss in sample_sets]
+
     def __run_query__(self, query):
-        pass
+        sparql = SPARQLWrapper(self.sparql_endpoint)
+        sparql.setQuery(query)
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
+        return [triple for triple in results['results']['bindings']]
 
     def __limma_normalization__(self, design, sparql_fields, compendium):
         ref = design['elements']['edges'][0]['data']['source']

@@ -23,11 +23,18 @@ class QuerySet():
         self._compendium = compendium
         self._object_type = object_type
         self._filter = {}
+        self._annotation_filter = {}
         self._fields = {'id'}
         self._object_fields = {}
         self._annotation_class = annotation_class
 
     def __iter__(self):
+        # sparql filtered ids
+        filtered_ids = []
+        for k, v in self._annotation_filter.items():
+            filtered_ids.append(set(self._annotation_class.filter(k, v, graphql_query=self)))
+        if filtered_ids:
+            self._filter['id_In'] = list(set.intersection(*filtered_ids))
         # putative sparql fields
         sparql_fields = self._fields.intersection(set(self._annotation_class.QUERIES.keys()))
         # remove non-graphql fields
@@ -56,10 +63,19 @@ class QuerySet():
         raise StopIteration
 
     def filter(self, *args, **kwargs):
+        try:
+            annotation_filter = list(self._compendium.ANNOTATION_CLASSES[self._object_type].QUERIES.keys())
+        except Exception as e:
+            annotation_filter = []
         for k, v in kwargs.items():
-            if k not in self._filter:
-                self._filter[k] = []
-            self._filter[k].append(v)
+            if k in annotation_filter:
+                if k not in self._annotation_filter:
+                    self._annotation_filter[k] = []
+                self._annotation_filter[k].append(v)
+            else:
+                if k not in self._filter:
+                    self._filter[k] = []
+                self._filter[k].append(v)
         return self
 
     @property
@@ -162,15 +178,22 @@ class QuerySet():
         for k, v in self._filter.items():
             _v = []
             _is_num = False
+            _is_list = False
             for i in v:
                 if type(i) == list:
-                    _v.append(','.join(i))
+                    if k.endswith('_In'):
+                        _v.append(','.join(i))
+                    else:
+                        _v.append(','.join(['"{}"'.format(x) for x in i]))
+                        _is_list = True
                     continue
                 elif type(i) == float or type(i) == int or i.isnumeric():
                     _is_num = True
                 _v.append(str(i))
             if _is_num:
                 filter.append('{}:{}'.format(k, ','.join(_v)))
+            elif _is_list:
+                filter.append('{}:[{}]'.format(k, ','.join(_v)))
             else:
                 filter.append('{}:"{}"'.format(k, ','.join(_v)))
         filter = ','.join(filter)
